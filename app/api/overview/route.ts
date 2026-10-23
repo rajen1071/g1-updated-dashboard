@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   try {
     // Unpublished and test emails, pages and forms are left out of every count.
     const multi = Object.keys(INSTANCES[key].products).length > 1;
-    const H = await hidden(key, !!q.get("refresh"));
+    const H = await hidden(key);
     const byPromise = Promise.resolve(idsByProduct(key, H.liveEmails));
     const P = product ? ((await byPromise)[product] || []).join(",") : "";
     if (product && !P) return Response.json({ series: [], kpi: null, products: [], empty: true });
@@ -59,7 +59,7 @@ export async function GET(req: Request) {
       () => count(key, "lead_donotcontact", [...rng("date_added", before), { col: "channel", expr: "eq", val: "email" }, { col: "reason", expr: "eq", val: 2 }, ...inP("channel_id")]),
       () => count(key, "lead_donotcontact", [...rng("date_added", before), { col: "channel", expr: "eq", val: "email" }, { col: "reason", expr: "eq", val: 1 }, ...inP("channel_id")]),
     ];
-    const [r, pv, pr] = await Promise.all([runPool(tasks, 8), runPool(prevTasks, 4), byPromise.then((byP) => {
+    const [r, pv, pr] = await Promise.all([runPool(tasks, 12), runPool(prevTasks, 4), byPromise.then((byP) => {
       const prods = !product && multi ? Object.entries(byP) : [];
       return runPool(prods.flatMap(([name, ids]) => [
         () => count(key, "email_stats", [...rng("date_sent", whole), { col: "email_id", expr: "in", val: ids.join(",") }]),

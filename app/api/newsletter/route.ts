@@ -8,10 +8,10 @@ export const dynamic = "force-dynamic";
 // A newsletter is often unpublished after it goes out, so sent newsletters are kept even when unpublished. Test emails are left out.
 const isNewsletter = (e: any) => /newsletter/i.test(`${e.name || ""} ${e.category?.title || ""}`) && !/\btest/i.test(e.name || "") && (!!e.isPublished || Number(e.sentCount) > 0);
 
-async function rows(key: string, fresh: boolean) {
-  const list = (await listAll(key, "emails", false, fresh)).filter(isNewsletter);
+async function rows(key: string) {
+  const list = (await listAll(key, "emails", false)).filter(isNewsletter);
   if (!list.length) return [];
-  const clicks = await uniqueClicks(key, fresh);
+  const clicks = await uniqueClicks(key);
   const dnc = (id: number, reason: number) => () => count(key, "lead_donotcontact", [{ col: "channel", expr: "eq", val: "email" }, { col: "channel_id", expr: "eq", val: id }, { col: "reason", expr: "eq", val: reason }]);
   const c = await runPool(list.flatMap((e) => [dnc(e.id, 2), dnc(e.id, 1), () => count(key, "page_hits", [{ col: "source", expr: "eq", val: "email" }, { col: "source_id", expr: "eq", val: e.id }])]), 8);
   return list.map((e, i) => ({
@@ -29,7 +29,7 @@ export async function GET(req: Request) {
   const hit = await cacheGet(ck, !!q.get("refresh"));
   if (hit) return Response.json({ ...hit, cached: true });
   try {
-    const data = { rows: await rows(key, !!q.get("refresh")) };
+    const data = { rows: await rows(key) };
     await cacheSet(ck, data);
     return Response.json(data);
   } catch (e: any) {

@@ -1,6 +1,6 @@
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { INSTANCES } from "@/lib/instances";
-import { count, isLive, listAll, productOf, runPool, uniqueClicks } from "@/lib/mautic";
+import { campaignEmails, count, isLive, listAll, productOf, runPool, uniqueClicks } from "@/lib/mautic";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
@@ -9,8 +9,8 @@ const rank = <T,>(list: T[], f: (x: T) => number) => [...list].sort((a, b) => f(
 
 // Top emails, campaigns and landing pages for one instance, from the all-time counters stored by Mautic.
 // Mautic does not link form submissions to an email, so emails and campaigns have no form column. Unpublished and test items are left out.
-async function top(key: string, fresh: boolean) {
-  const [emails, clicks, campaigns, pages] = await Promise.all([listAll(key, "emails", false, fresh), uniqueClicks(key, fresh), listAll(key, "campaigns", false, fresh), listAll(key, "pages", false, fresh)]);
+async function top(key: string) {
+  const [emails, clicks, campaigns, sends, pages] = await Promise.all([listAll(key, "emails", false), uniqueClicks(key), listAll(key, "campaigns", true), campaignEmails(key), listAll(key, "pages", false)]);
   const em = emails.filter(isLive).map((e) => ({ id: e.id, name: e.name || "", product: productOf(key, e), sent: Number(e.sentCount) || 0, opened: Number(e.readCount) || 0, clicks: clicks[e.id] || 0 }));
   const byId = new Map(em.map((e) => [Number(e.id), e]));
 
@@ -20,7 +20,7 @@ async function top(key: string, fresh: boolean) {
 
   // A campaign's numbers are the totals of the emails it sends.
   const camp = campaigns.filter(isLive).map((c) => {
-    const ids = [...new Set<number>((c.events || []).map((v: any) => Number(v.channel === "email" ? v.channelId : v.properties?.email) || 0).filter((id: number) => byId.has(id)))];
+    const ids = [...new Set<number>((sends[c.id] || []).filter((id) => byId.has(id)))];
     const sum = (f: "sent" | "opened" | "clicks") => ids.reduce((a, id) => a + byId.get(id)![f], 0);
     return { id: c.id, name: c.name || "", published: !!c.isPublished, ids, sent: sum("sent"), opened: sum("opened"), clicks: sum("clicks") };
   });
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
   const hit = await cacheGet(ck, !!q.get("refresh"));
   if (hit) return Response.json({ ...hit, cached: true });
   try {
-    const data = await top(key, !!q.get("refresh"));
+    const data = await top(key);
     await cacheSet(ck, data);
     return Response.json(data);
   } catch (e: any) {

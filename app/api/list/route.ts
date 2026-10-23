@@ -9,15 +9,15 @@ const base = (e: any) => ({ id: e.id, name: e.name || e.title || "", category: e
 
 // Emails and pages: all-time counters stored by Mautic. Forms: submissions inside the selected dates.
 // Unpublished and test items are left out.
-async function rows(key: string, type: string, from: string, to: string, fresh: boolean) {
+async function rows(key: string, type: string, from: string, to: string) {
   if (type === "emails") {
-    const [list, clicks] = await Promise.all([listAll(key, "emails", false, fresh), uniqueClicks(key, fresh)]);
+    const [list, clicks] = await Promise.all([listAll(key, "emails", false), uniqueClicks(key)]);
     return list.filter(isLive).map((e) => ({ ...base(e), subject: e.subject || "", product: productOf(key, e), kind: e.emailType || "", parent: e.variantParent?.id || null,
       sent: Number(e.sentCount) || 0, opened: Number(e.readCount) || 0, clicks: clicks[e.id] || 0 }));
   }
-  if (type === "pages") return (await listAll(key, "pages", false, fresh)).filter(isLive).map((e) => ({ ...base(e), hits: Number(e.hits) || 0, unique: Number(e.uniqueHits) || 0 }));
-  if (type === "campaigns") return (await listAll(key, "campaigns", false, fresh)).filter(isLive).map((e) => ({ ...base(e), events: e.events?.length || 0, segments: e.lists?.length || 0, forms: e.forms?.length || 0 }));
-  const forms = (await listAll(key, "forms", true, fresh)).filter(isLive);
+  if (type === "pages") return (await listAll(key, "pages", false)).filter(isLive).map((e) => ({ ...base(e), hits: Number(e.hits) || 0, unique: Number(e.uniqueHits) || 0 }));
+  if (type === "campaigns") return (await listAll(key, "campaigns", false)).filter(isLive).map((e) => ({ ...base(e), events: e.events?.length || 0, segments: e.lists?.length || 0, forms: e.forms?.length || 0 }));
+  const forms = (await listAll(key, "forms", true)).filter(isLive);
   // Submissions in the selected dates, in the same number of days just before them, and all time.
   const f0 = new Date(from + "T00:00:00Z"), t0 = new Date(new Date(to + "T00:00:00Z").getTime() + 864e5);
   const F = fmt(f0), T = fmt(t0), B = fmt(new Date(+f0 - (+t0 - +f0)));
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   const hit = await cacheGet(ck, !!q.get("refresh"));
   if (hit) return Response.json({ ...hit, cached: true });
   try {
-    const data = { rows: await rows(key, type, from, to, !!q.get("refresh")) };
+    const data = { rows: await rows(key, type, from, to) };
     await cacheSet(ck, data);
     return Response.json(data);
   } catch (e: any) {

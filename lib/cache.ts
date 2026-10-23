@@ -46,7 +46,7 @@ async function markRefresh() {
   try {
     const col = await collection();
     await col?.replaceOne({ _id: META }, { at: new Date(stamp.at) }, { upsert: true });
-    await col?.deleteMany({ _id: { $ne: META }, at: { $lt: new Date(stamp.at) } }); // old answers are no longer used
+    await col?.deleteMany({ _id: { $not: /^(meta|keep)\|/ }, at: { $lt: new Date(stamp.at) } }); // old answers are no longer used
   } catch (e: any) { console.error("MongoDB write failed:", e.message); }
 }
 
@@ -67,5 +67,22 @@ export async function cacheSet(key: string, data: any) {
   mem.set(key, { at: Date.now(), data });
   try {
     await (await collection())?.replaceOne({ _id: key }, { at: new Date(), data }, { upsert: true });
+  } catch (e: any) { console.error("MongoDB write failed:", e.message); }
+}
+
+// Facts that a Refresh does not change (for example deleted email ids, which Mautic never reuses). Kept until removed by hand.
+const keep = new Map<string, any>();
+export async function keepGet(key: string) {
+  if (keep.has(key)) return keep.get(key);
+  try {
+    const doc = await (await collection())?.findOne({ _id: `keep|${key}` });
+    if (doc) { keep.set(key, doc.data); return doc.data; }
+  } catch (e: any) { console.error("MongoDB read failed:", e.message); }
+  return null;
+}
+export async function keepSet(key: string, data: any) {
+  keep.set(key, data);
+  try {
+    await (await collection())?.replaceOne({ _id: `keep|${key}` }, { at: new Date(), data }, { upsert: true });
   } catch (e: any) { console.error("MongoDB write failed:", e.message); }
 }

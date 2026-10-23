@@ -1,4 +1,4 @@
-import { refreshedAt } from "./cache";
+import { cacheGet, cacheSet, keepGet, keepSet } from "./cache";
 import { INSTANCES } from "./instances";
 const tok: Record<string, { t: string; exp: number }> = {};
 export type W = { col: string; expr: string; val: string | number };
@@ -17,13 +17,15 @@ export async function mget(key: string, path: string, params: Record<string, str
   const u = new URL(`${INSTANCES[key].url}/api/${path}`);
   Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, String(v)));
   for (let a = 0; a < 3; a++) {
-    const r = await fetch(u, { headers: { Authorization: `Bearer ${await token(key)}` }, cache: "no-store" });
+    // A Mautic call that hangs is stopped after 45 seconds (including reading the answer) and tried again.
+    const r = await fetch(u, { headers: { Authorization: `Bearer ${await token(key)}` }, cache: "no-store", signal: AbortSignal.timeout(45_000) })
+      .then(async (r) => ({ status: r.status, body: r.ok ? await r.json() : null })).catch(() => null);
+    if (!r || r.status >= 500) { await new Promise((s) => setTimeout(s, 1000 * (a + 1))); continue; }
     if (r.status === 401) { delete tok[key]; continue; }
-    if (r.status >= 500) { await new Promise((s) => setTimeout(s, 1000 * (a + 1))); continue; }
-    if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
-    return r.json();
+    if (r.status >= 400) throw new Error(`${path}: HTTP ${r.status}`);
+    return r.body;
   }
-  throw new Error(`${path}: failed after retries`);
+  throw new Error(`${path}: Mautic did not answer in time, please try again`);
 }
 // limit=1 + the response "total" gives only the count, so no rows are downloaded
 export async function count(key: string, table: string, where: W[]) {
@@ -37,54 +39,85 @@ export async function runPool<T>(tasks: (() => Promise<T>)[], n = 8): Promise<T[
   return out;
 }
 
+// Building blocks used by several API routes (lists, A/B variants, clicks). Each is built once, saved like an API answer
+// (memory, and MongoDB when set) and reused by every route and server until the next Refresh click.
+// Requests that arrive while one is being built wait for that build instead of starting their own.
+const building = new Map<string, Promise<any>>();
+async function shared<T>(key: string, build: () => Promise<T>): Promise<T> {
+  const hit = await cacheGet(key);
+  if (hit) return hit;
+  if (!building.has(key)) building.set(key, build().then(async (d) => { await cacheSet(key, d); return d; }).finally(() => building.delete(key)));
+  return building.get(key)!;
+}
+
+// Only the fields the dashboard uses are kept, so saved lists stay small (the full emails include their HTML).
+const slim = (e: any) => ({
+  id: e.id, name: e.name, title: e.title, subject: e.subject, isPublished: e.isPublished, emailType: e.emailType,
+  publishUp: e.publishUp, dateAdded: e.dateAdded, dateModified: e.dateModified, sentCount: e.sentCount, readCount: e.readCount, hits: e.hits, uniqueHits: e.uniqueHits,
+  category: e.category ? { title: e.category.title } : undefined, variantParent: e.variantParent ? { id: e.variantParent.id } : undefined,
+  lists: e.lists?.map((l: any) => ({ name: l.name })), forms: e.forms?.map((f: any) => ({ id: f.id })),
+  events: e.events?.map((v: any) => ({ channel: v.channel, channelId: v.channelId, properties: { email: v.properties?.email } })),
+});
+
 // Full list of emails / pages / forms / campaigns, kept until the next Refresh click.
 // minimal=true skips the HTML body (about 50x smaller), but also drops counters like sentCount.
-const listCache = new Map<string, { at: number; list: any[] }>();
-export async function listAll(key: string, path: string, minimal: boolean, fresh = false) {
-  const ck = `${key}|${path}|${minimal}`, c = listCache.get(ck);
-  if (c && !fresh && c.at > refreshedAt()) return c.list;
-  const size = minimal ? 500 : 100, out: any[] = [];
-  for (let s = 0; ; s += size) {
-    const d = await mget(key, path, { limit: size, start: s, orderBy: "id", orderByDir: "asc", ...(minimal ? { minimal: 1 } : {}) });
-    const l: any[] = Object.values(d[path] || {});
-    out.push(...l); if (l.length < size) break;
-  }
-  if (path === "emails") out.push(...(await missingEmails(key, out, fresh)));
-  listCache.set(ck, { at: Date.now(), list: out });
-  return out;
+// The pages of a list are loaded at the same time, because Mautic is slow to answer for big pages.
+export function listAll(key: string, path: string, minimal: boolean): Promise<any[]> {
+  return shared(`raw|${key}|${path}|${minimal}`, async () => {
+    // Full campaigns carry the whole setup of every step (up to 1 MB each), so they are loaded 5 at a time.
+    const size = minimal ? 500 : path === "campaigns" ? 5 : 25, get = (s: number) => mget(key, path, { limit: size, start: s, orderBy: "id", orderByDir: "asc", ...(minimal ? { minimal: 1 } : {}) });
+    const first = await get(0), total = Number(first.total) || 0;
+    const rest = await runPool(Array.from({ length: Math.max(0, Math.ceil(total / size) - 1) }, (_, i) => () => get((i + 1) * size)), path === "campaigns" ? 16 : 6);
+    const out = [first, ...rest].flatMap((d) => Object.values(d[path] || {}) as any[]).map(slim);
+    if (path === "emails") out.push(...(await missingEmails(key, out)));
+    return out;
+  });
 }
 // The email list API leaves out A/B test variants, but their sends are still in the stats.
-// Look up every id the list skipped (and a few past the highest one); deleted ids return 404 and are ignored.
-const variantCache = new Map<string, { at: number; list: any[] }>();
-async function missingEmails(key: string, list: any[], fresh: boolean) {
-  const c = variantCache.get(key);
-  if (c && !fresh && c.at > refreshedAt()) return c.list;
-  const have = new Set(list.map((e) => Number(e.id))), max = Math.max(0, ...have), found: any[] = [];
-  const get = (id: number) => () => mget(key, `emails/${id}`).then((d) => d.email || null).catch(() => null);
-  const ids = Array.from({ length: max }, (_, i) => i + 1).filter((id) => !have.has(id));
-  found.push(...(await runPool(ids.map(get), 16)).filter(Boolean));
-  for (let s = max + 1; ; s += 16) {
-    const more = (await runPool(Array.from({ length: 16 }, (_, i) => get(s + i)), 16)).filter(Boolean);
-    found.push(...more); if (!more.length) break;
-  }
-  variantCache.set(key, { at: Date.now(), list: found });
-  return found;
+// Look up every id the list skipped (and a few past the highest one). Deleted ids return 404 and are remembered for good,
+// because Mautic never reuses an id, so later loads only look up the variants.
+function missingEmails(key: string, list: any[]): Promise<any[]> {
+  return shared(`raw|${key}|variants`, async () => {
+    const gone = new Set<number>((await keepGet(`gone|${key}`)) || []);
+    const have = new Set(list.map((e) => Number(e.id))), max = Math.max(0, ...have), found: any[] = [], missing: number[] = [];
+    const get = (id: number) => () => mget(key, `emails/${id}`).then((d) => (d.email ? slim(d.email) : null)).catch((e) => { if (/HTTP 404/.test(e.message)) missing.push(id); return null; });
+    const ids = Array.from({ length: max }, (_, i) => i + 1).filter((id) => !have.has(id) && !gone.has(id));
+    found.push(...(await runPool(ids.map(get), 16)).filter(Boolean));
+    for (let s = max + 1; ; s += 16) {
+      const more = (await runPool(Array.from({ length: 16 }, (_, i) => get(s + i)), 16)).filter(Boolean);
+      found.push(...more); if (!more.length) break;
+    }
+    // Only ids below the highest existing one are surely deleted; higher ids may still be created.
+    const top = Math.max(max, ...found.map((e) => Number(e.id)));
+    const newGone = missing.filter((id) => id < top && !gone.has(id));
+    if (newGone.length) await keepSet(`gone|${key}`, [...gone, ...newGone]);
+    return found;
+  });
+}
+// Emails sent by each campaign (campaign id -> email ids), read from the steps of each campaign.
+// This is much faster than the full campaign list, which repeats the whole setup of every step.
+// Steps are asked for one campaign at a time, because Mautic's paging of the whole step list skips and repeats steps.
+export function campaignEmails(key: string): Promise<Record<string, number[]>> {
+  return shared(`raw|${key}|campaign-emails`, async () => {
+    const camps = await listAll(key, "campaigns", true);
+    const steps = await runPool(camps.map((c) => () => mget(key, "campaigns/events", { limit: 1000, "where[0][col]": "campaign", "where[0][expr]": "eq", "where[0][val]": c.id })), 8);
+    return Object.fromEntries(camps.map((c, i) => [c.id, (Object.values(steps[i].events || {}) as any[])
+      .map((v) => Number(v.channel === "email" ? v.channelId : v.properties?.properties?.email ?? v.properties?.email) || 0).filter(Boolean)]));
+  });
 }
 // Unique clicks per email: Mautic keeps unique_hits per tracked link, so these are summed for each email.
-const clickCache = new Map<string, { at: number; m: Record<string, number> }>();
-export async function uniqueClicks(key: string, fresh: boolean) {
-  const c = clickCache.get(key);
-  if (c && !fresh && c.at > refreshedAt()) return c.m;
-  const m: Record<string, number> = {};
-  for (let s = 0; ; ) {
-    const d = await mget(key, "stats/channel_url_trackables", { limit: 1000, start: s, "where[0][col]": "channel", "where[0][expr]": "eq", "where[0][val]": "email" });
-    const rows: any[] = d.stats || [];
-    rows.forEach((r) => (m[r.channel_id] = (m[r.channel_id] || 0) + (Number(r.unique_hits) || 0)));
-    s += rows.length;
-    if (!rows.length || s >= Number(d.total)) break;
-  }
-  clickCache.set(key, { at: Date.now(), m });
-  return m;
+export function uniqueClicks(key: string): Promise<Record<string, number>> {
+  return shared(`raw|${key}|clicks`, async () => {
+    const m: Record<string, number> = {};
+    for (let s = 0; ; ) {
+      const d = await mget(key, "stats/channel_url_trackables", { limit: 1000, start: s, "where[0][col]": "channel", "where[0][expr]": "eq", "where[0][val]": "email" });
+      const rows: any[] = d.stats || [];
+      rows.forEach((r) => (m[r.channel_id] = (m[r.channel_id] || 0) + (Number(r.unique_hits) || 0)));
+      s += rows.length;
+      if (!rows.length || s >= Number(d.total)) break;
+    }
+    return m;
+  });
 }
 
 // An email belongs to the first product whose keyword appears in its category or name. "*" matches every email.
@@ -97,8 +130,8 @@ export function productOf(key: string, e: any) {
 // Unpublished items and anything named or filed as a test are left out of every number in the dashboard.
 export const isLive = (e: any) => !!e.isPublished && !/\btest/i.test(`${e.name || e.title || ""} ${e.category?.title || ""}`);
 // Hidden email, page and form ids (comma separated, for "notIn" filters on the stats tables) and the live emails.
-export async function hidden(key: string, fresh = false) {
-  const [emails, pages, forms] = await Promise.all([listAll(key, "emails", true, fresh), listAll(key, "pages", true, fresh), listAll(key, "forms", true, fresh)]);
+export async function hidden(key: string) {
+  const [emails, pages, forms] = await Promise.all([listAll(key, "emails", true), listAll(key, "pages", true), listAll(key, "forms", true)]);
   const ids = (l: any[]) => l.filter((x) => !isLive(x)).map((x) => x.id).join(",");
   return { emails: ids(emails), pages: ids(pages), forms: ids(forms), liveEmails: emails.filter(isLive) };
 }

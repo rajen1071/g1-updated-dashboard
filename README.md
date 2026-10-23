@@ -22,3 +22,5 @@ Vercel runs the API in many short-lived functions, and each one starts with an e
 With `MONGODB_URI` set, every API answer is also saved in MongoDB (database `MONGODB_DB`, default `atlas-g1-email-dashboard`, collection `api_cache`) and shared by all functions.
 Answers never expire on their own. **Refresh** stores a "refreshed at" time, so every saved answer from before it is loaded again from Mautic once (the current page right away, other pages when they are opened). Old answers are then deleted.
 Without `MONGODB_URI` (or if MongoDB is down) the dashboard works exactly as before, using memory only.
+The slow building blocks (email list with A/B variants, campaign list, clicks) are saved the same way and shared by every API route, so a cold start loads them from Mautic only once. Deleted email ids are remembered for good (`keep|...` documents), so they are not looked up again.
+If the server runs out of time, the browser tries the request again (up to 3 times); each try continues from the parts already saved.

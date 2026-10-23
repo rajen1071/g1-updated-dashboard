@@ -7,9 +7,19 @@ export type Range = { from: string; to: string };
 
 // Answers are kept in memory while the tab is open, so moving between pages does not reload them.
 const memo = new Map<string, any>();
+// When the server runs out of time (Vercel answers with a text page, not JSON) the request is tried again.
+// Each try continues from the parts the server already saved, so a later try usually succeeds.
 export async function getJson(url: string, fresh = false) {
   if (!fresh && memo.has(url)) return memo.get(url);
-  const d = await fetch(url + (fresh ? "&refresh=1" : "")).then((r) => r.json()).catch((e) => ({ error: `Could not load data (${e.message})` }));
+  let d: any;
+  for (let a = 0; a < 3; a++) {
+    d = await fetch(url + (fresh && a === 0 ? "&refresh=1" : "")).then(async (r) => {
+      const t = await r.text();
+      try { return JSON.parse(t); } catch { return { error: "The server took too long to answer. Please click Refresh or try again in a minute.", retry: true }; }
+    }).catch(() => ({ error: "Could not reach the server. Please check your connection and try again.", retry: true }));
+    if (!d.retry) break;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
   if (!d.error) memo.set(url, d);
   return d;
 }

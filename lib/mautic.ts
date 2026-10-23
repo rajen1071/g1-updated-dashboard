@@ -120,18 +120,59 @@ export function uniqueClicks(key: string): Promise<Record<string, number>> {
   });
 }
 
-// An email belongs to the first product whose keyword appears in its category or name. "*" matches every email.
+// Start and end of the selected dates as Mautic date-time text (the end date is included).
+const fmt = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
+export const span = (from: string, to: string) => [fmt(new Date(from + "T00:00:00Z")), fmt(new Date(new Date(to + "T00:00:00Z").getTime() + 864e5))];
+
+// Sends, opens and email clicks of each live email in the selected dates (opens and clicks of the emails sent in those dates).
+// Sends are counted for every email first; opens and clicks only for the emails that sent something, which saves many Mautic calls.
+export function emailsInRange(key: string, from: string, to: string): Promise<Record<string, { sent: number; opened: number; clicks: number }>> {
+  return shared(`raw|${key}|emails-range|${from}|${to}`, async () => {
+    const [F, T] = span(from, to);
+    const rng = (col: string): W[] => [{ col, expr: "gte", val: F }, { col, expr: "lt", val: T }];
+    const list = (await listAll(key, "emails", false)).filter((e) => isLive(e) && Number(e.sentCount) > 0);
+    // Groups of 10 emails are counted first; only the emails of groups that sent something are counted one by one.
+    const sentTo = (ids: number[]) => () => count(key, "email_stats", [{ col: "email_id", expr: ids.length > 1 ? "in" : "eq", val: ids.join(",") }, ...rng("date_sent")]);
+    const groups = Array.from({ length: Math.ceil(list.length / 10) }, (_, i) => list.slice(i * 10, i * 10 + 10).map((e) => Number(e.id)));
+    const groupSent = await runPool(groups.map(sentTo), 24);
+    const maybe = groups.filter((_, i) => groupSent[i] > 0).flat();
+    const each = await runPool(maybe.map((id) => sentTo([id])), 24);
+    const sentById = new Map(maybe.map((id, i) => [id, each[i]]));
+    const sent = list.map((e) => sentById.get(Number(e.id)) || 0);
+    const active = list.filter((_, i) => sent[i] > 0);
+    const oc = await runPool(active.flatMap((e) => [
+      () => count(key, "email_stats", [{ col: "email_id", expr: "eq", val: e.id }, { col: "is_read", expr: "eq", val: 1 }, ...rng("date_sent")]),
+      () => count(key, "page_hits", [{ col: "source", expr: "eq", val: "email" }, { col: "source_id", expr: "eq", val: e.id }, ...rng("date_hit")]),
+    ]), 24);
+    const out: Record<string, { sent: number; opened: number; clicks: number }> = {};
+    list.forEach((e, i) => (out[e.id] = { sent: sent[i], opened: 0, clicks: 0 }));
+    active.forEach((e, i) => Object.assign(out[e.id], { opened: oc[i * 2], clicks: oc[i * 2 + 1] }));
+    return out;
+  });
+}
+// Visits of each live landing page in the selected dates.
+export function pagesInRange(key: string, from: string, to: string): Promise<Record<string, number>> {
+  return shared(`raw|${key}|pages-range|${from}|${to}`, async () => {
+    const [F, T] = span(from, to);
+    const list = (await listAll(key, "pages", false)).filter((p) => isLive(p) && Number(p.hits) > 0);
+    const hits = await runPool(list.map((p) => () => count(key, "page_hits", [{ col: "page_id", expr: "eq", val: p.id }, { col: "date_hit", expr: "gte", val: F }, { col: "date_hit", expr: "lt", val: T }])), 16);
+    return Object.fromEntries(list.map((p, i) => [p.id, hits[i]]));
+  });
+}
+
+// An email, landing page or form belongs to the first product whose keyword appears in its category or name (title for pages).
+// "*" matches everything. Items that match no product (for example newsletters or system forms) have no product ("").
 export function productOf(key: string, e: any) {
-  const text = `${e.category?.title || ""} ${e.name || ""}`.toLowerCase();
+  const text = `${e.category?.title || ""} ${e.name || e.title || ""}`.toLowerCase();
   for (const [p, kws] of Object.entries(INSTANCES[key].products)) if (kws.some((k) => k === "*" || text.includes(k))) return p;
-  return "Other";
+  return "";
 }
 
 // Unpublished items and anything named or filed as a test are left out of every number in the dashboard.
 export const isLive = (e: any) => !!e.isPublished && !/\btest/i.test(`${e.name || e.title || ""} ${e.category?.title || ""}`);
-// Hidden email, page and form ids (comma separated, for "notIn" filters on the stats tables) and the live emails.
+// Hidden email, page and form ids (comma separated, for "notIn" filters on the stats tables) and the live emails, pages and forms.
 export async function hidden(key: string) {
   const [emails, pages, forms] = await Promise.all([listAll(key, "emails", true), listAll(key, "pages", true), listAll(key, "forms", true)]);
   const ids = (l: any[]) => l.filter((x) => !isLive(x)).map((x) => x.id).join(",");
-  return { emails: ids(emails), pages: ids(pages), forms: ids(forms), liveEmails: emails.filter(isLive) };
+  return { emails: ids(emails), pages: ids(pages), forms: ids(forms), liveEmails: emails.filter(isLive), livePages: pages.filter(isLive), liveForms: forms.filter(isLive) };
 }

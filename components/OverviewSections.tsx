@@ -1,24 +1,24 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { INSTANCES } from "@/lib/instances";
 import { THEMES } from "@/lib/themes";
-import { combine, getJson, listUrl, Range } from "@/lib/client";
+import { combine, listUrl, Range } from "@/lib/client";
+import { useData } from "@/lib/useData";
 import { day, n, pct } from "@/lib/format";
 import Icon from "./Icon";
 import { Change, tip } from "./Overview";
 import { nlTitle, useNewsletters } from "./NewsletterView";
 import { Card, Errors, Sk } from "./ui";
 
-type Props = { ks: string[]; range: Range; nonce: number; onGo: (view: string) => void };
+type Props = { ks: string[]; range: Range; product: string; nonce: number; onGo: (view: string) => void };
 const TOP = 5;
 
 // Overview: the latest newsletter and the forms, each with a link to its full page.
-export default function OverviewSections({ ks, range, nonce, onGo }: Props) {
+export default function OverviewSections({ ks, range, product, nonce, onGo }: Props) {
   return (
     <div className="grid-1-1">
       <LatestNewsletter ks={ks} nonce={nonce} onGo={onGo} />
-      <FormsSummary ks={ks} range={range} nonce={nonce} onGo={onGo} />
+      <FormsSummary ks={ks} range={range} product={product} nonce={nonce} onGo={onGo} />
     </div>
   );
 }
@@ -67,18 +67,11 @@ function LatestNewsletter({ ks, nonce, onGo }: { ks: string[]; nonce: number; on
   );
 }
 
-function FormsSummary({ ks, range, nonce, onGo }: Props) {
-  const [res, setRes] = useState<Record<string, any>>({});
-  const req = useRef(0), seen = useRef(nonce);
-  useEffect(() => {
-    const id = ++req.current, fresh = seen.current !== nonce;
-    seen.current = nonce;
-    setRes({});
-    ks.forEach((k) => getJson(listUrl("forms", k, range), fresh).then((d) => { if (id === req.current) setRes((p) => ({ ...p, [k]: d })); }));
-  }, [ks.join(), range.from, range.to, nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+function FormsSummary({ ks, range, product, nonce, onGo }: Props) {
+  const { res } = useData(ks, (k) => listUrl("forms", k, range), nonce);
 
   const loading = ks.some((k) => !res[k]);
-  const rows: any[] = ks.flatMap((k) => (res[k]?.rows || []).map((r: any) => ({ ...r, inst: k })));
+  const rows: any[] = ks.flatMap((k) => (res[k]?.rows || []).map((r: any) => ({ ...r, inst: k }))).filter((r) => !product || r.product === product);
   const first = loading && !rows.length;
   const sum = (f: string) => rows.reduce((a, r) => a + (r[f] || 0), 0);
   const subs = sum("submissions"), prev = sum("prev");

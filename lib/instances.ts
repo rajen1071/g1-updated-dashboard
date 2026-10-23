@@ -1,5 +1,5 @@
 // products: an email belongs to a product when one of its keywords appears in the email category or name. ["*"] = every email.
-// With more than one product, emails that match none are grouped as "Other".
+// Emails that match no product (for example newsletters) are not shown under any product.
 // icon: optional white logo in public/, shown on a colored tile.
 // group: the brand section the instance is shown under (Altametrics or Plum).
 export const INSTANCES: Record<string, { label: string; short: string; url: string; env: string; icon?: string; group: string; products: Record<string, string[]> }> = {

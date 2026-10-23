@@ -1,39 +1,44 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { INSTANCES } from "@/lib/instances";
-import { getJson, listUrl, Range } from "@/lib/client";
+import { listUrl, Range } from "@/lib/client";
 import { day, n, pct } from "@/lib/format";
+import { useData } from "@/lib/useData";
 import Icon from "./Icon";
 import { Change } from "./Overview";
 import { Card, Errors, Loading, Sk } from "./ui";
 
 type Col = { k: string; label: string; num?: boolean; get?: (r: any) => any; show?: (r: any) => React.ReactNode };
 const modified: Col = { k: "modified", label: "Last Updated", show: (r) => day(r.modified, true) };
+const product: Col = { k: "product", label: "Product", show: (r) => r.product || "—" };
 const name = (sub?: string): Col => ({ k: "name", label: "Name", show: (r) => <div className="cell-name"><div><b>{r.name}</b>{sub && r[sub] && <small>{r[sub]}</small>}</div></div> });
 
 export const LISTS: Record<string, { label: string; note: string; cols: Col[]; sort: string; stats: (r: any[]) => [string, string][] }> = {
   emails: {
-    label: "emails", sort: "sent", note: "Sent and open numbers are all-time totals stored by Mautic. They do not change with the selected dates.",
-    cols: [name("subject"), { k: "product", label: "Product", show: (r) => r.product || "—" }, { k: "category", label: "Category", show: (r) => r.category || "—" },
-      { k: "sent", label: "Sent", num: true, show: (r) => n(r.sent) }, { k: "opened", label: "Opens", num: true, show: (r) => n(r.opened) }, { k: "clicks", label: "Unique Clicks", num: true, show: (r) => n(r.clicks) },
-      { k: "rate", label: "Open Rate", num: true, get: (r) => (r.sent ? r.opened / r.sent : -1), show: (r) => pct(r.opened, r.sent) }, modified],
-    stats: (r) => { const s = r.reduce((a, x) => a + x.sent, 0), o = r.reduce((a, x) => a + x.opened, 0); return [["Emails", n(r.length)], ["Total sent (all time)", n(s)], ["Total opens (all time)", n(o)], ["Average open rate", pct(o, s)]]; },
+    label: "emails", sort: "sent", note: "Sends in the selected dates, with the opens and email clicks of those sends. All Time Sent is the total stored by Mautic.",
+    cols: [name("subject"), product, { k: "category", label: "Category", show: (r) => r.category || "—" },
+      { k: "sent", label: "Sent", num: true, show: (r) => n(r.sent) }, { k: "opened", label: "Opens", num: true, show: (r) => n(r.opened) }, { k: "clicks", label: "Email Clicks", num: true, show: (r) => n(r.clicks) },
+      { k: "rate", label: "Open Rate", num: true, get: (r) => (r.sent ? r.opened / r.sent : -1), show: (r) => pct(r.opened, r.sent) },
+      { k: "allSent", label: "All Time Sent", num: true, show: (r) => n(r.allSent) }, modified],
+    stats: (r) => { const s = r.reduce((a, x) => a + x.sent, 0), o = r.reduce((a, x) => a + x.opened, 0); return [["Emails sent in these dates", `${n(r.filter((x) => x.sent > 0).length)} of ${n(r.length)}`], ["Total sent", n(s)], ["Total opens", n(o)], ["Average open rate", pct(o, s)]]; },
   },
   campaigns: {
-    label: "campaigns", sort: "modified", note: "Campaign setup from Mautic: how many steps (events), segments and forms each campaign uses.",
-    cols: [name(), { k: "category", label: "Category", show: (r) => r.category || "—" }, { k: "events", label: "Steps", num: true, show: (r) => n(r.events) },
-      { k: "segments", label: "Segments", num: true, show: (r) => n(r.segments) }, { k: "forms", label: "Forms", num: true, show: (r) => n(r.forms) }, modified],
-    stats: (r) => [["Campaigns", n(r.length)], ["Total steps", n(r.reduce((a, x) => a + x.events, 0))], ["Using segments", n(r.filter((x) => x.segments > 0).length)], ["Using forms", n(r.filter((x) => x.forms > 0).length)]],
+    label: "campaigns", sort: "sent", note: "Sent, open rate and email clicks add up the emails each campaign sends, for the selected dates. Steps, segments and forms are the campaign setup.",
+    cols: [name(), { k: "category", label: "Category", show: (r) => r.category || "—" },
+      { k: "sent", label: "Sent", num: true, show: (r) => n(r.sent) }, { k: "rate", label: "Open Rate", num: true, get: (r) => (r.sent ? r.opened / r.sent : -1), show: (r) => pct(r.opened, r.sent) },
+      { k: "clicks", label: "Email Clicks", num: true, show: (r) => n(r.clicks) },
+      { k: "events", label: "Steps", num: true, show: (r) => n(r.events) }, { k: "segments", label: "Segments", num: true, show: (r) => n(r.segments) }, { k: "forms", label: "Forms", num: true, show: (r) => n(r.forms) }, modified],
+    stats: (r) => { const s = r.reduce((a, x) => a + x.sent, 0), o = r.reduce((a, x) => a + x.opened, 0); return [["Campaigns sending in these dates", `${n(r.filter((x) => x.sent > 0).length)} of ${n(r.length)}`], ["Emails sent", n(s)], ["Average open rate", pct(o, s)], ["Email clicks", n(r.reduce((a, x) => a + x.clicks, 0))]]; },
   },
   pages: {
-    label: "landing pages", sort: "hits", note: "Visit numbers are all-time totals stored by Mautic. They do not change with the selected dates.",
-    cols: [name(), { k: "category", label: "Category", show: (r) => r.category || "—" }, { k: "hits", label: "Visits", num: true, show: (r) => n(r.hits) },
-      { k: "unique", label: "Unique Visits", num: true, show: (r) => n(r.unique) }, modified],
-    stats: (r) => [["Landing pages", n(r.length)], ["With visits", n(r.filter((x) => x.hits > 0).length)], ["Total visits (all time)", n(r.reduce((a, x) => a + x.hits, 0))], ["Unique visits (all time)", n(r.reduce((a, x) => a + x.unique, 0))]],
+    label: "landing pages", sort: "visits", note: "Visits are counted for the selected dates. Mautic only keeps unique visitors as an all-time total, so those columns do not change with the dates.",
+    cols: [name(), product, { k: "category", label: "Category", show: (r) => r.category || "—" }, { k: "visits", label: "Visits", num: true, show: (r) => n(r.visits) },
+      { k: "hits", label: "All Time Visits", num: true, show: (r) => n(r.hits) }, { k: "unique", label: "All Time Unique", num: true, show: (r) => n(r.unique) }, modified],
+    stats: (r) => [["Landing pages visited", `${n(r.filter((x) => x.visits > 0).length)} of ${n(r.length)}`], ["Visits (selected dates)", n(r.reduce((a, x) => a + x.visits, 0))], ["Visits (all time)", n(r.reduce((a, x) => a + x.hits, 0))], ["Unique visits (all time)", n(r.reduce((a, x) => a + x.unique, 0))]],
   },
   forms: {
     label: "forms", sort: "submissions", note: "Submissions are counted for the selected dates, for the same number of days just before them, and for all time.",
-    cols: [name(), { k: "category", label: "Category", show: (r) => r.category || "—" }, { k: "submissions", label: "Submissions", num: true, show: (r) => n(r.submissions) },
+    cols: [name(), product, { k: "category", label: "Category", show: (r) => r.category || "—" }, { k: "submissions", label: "Submissions", num: true, show: (r) => n(r.submissions) },
       { k: "prev", label: "Previous Period", num: true, show: (r) => n(r.prev) },
       { k: "change", label: "Change", num: true, get: (r) => (r.prev ? (r.submissions - r.prev) / r.prev : r.submissions ? 1e9 : -1e9), show: (r) => <Change cur={r.submissions} prev={r.prev} /> },
       { k: "total", label: "All Time", num: true, show: (r) => n(r.total) }, modified],
@@ -45,22 +50,11 @@ const PAGE = 25;
 
 export default function ListView({ type, ks, range, product, nonce }: { type: string; ks: string[]; range: Range; product: string; nonce: number }) {
   const conf = LISTS[type];
-  const [res, setRes] = useState<Record<string, any>>({});
-  const [pending, setPending] = useState<string[]>([]);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState({ k: conf.sort, desc: true });
   const [page, setPage] = useState(0);
-  const req = useRef(0), seen = useRef(nonce);
 
-  useEffect(() => {
-    const id = ++req.current, fresh = seen.current !== nonce;
-    seen.current = nonce;
-    setRes({}); setPending(ks);
-    ks.forEach((k) => getJson(listUrl(type, k, range), fresh).then((d) => {
-      if (id !== req.current) return;
-      setRes((p) => ({ ...p, [k]: d })); setPending((p) => p.filter((x) => x !== k));
-    }));
-  }, [type, ks.join(), range.from, range.to, nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { res, pending } = useData(ks, (k) => listUrl(type, k, range), nonce);
   useEffect(() => setPage(0), [q, sort, product, ks.join()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const all = useMemo(() => ks.flatMap((k) => (res[k]?.rows || []).map((r: any) => ({ ...r, inst: k }))).filter((r) => !product || r.product === product), [res, ks, product]);

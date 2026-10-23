@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { INSTANCES } from "@/lib/instances";
-import { getJson, listUrl, Range } from "@/lib/client";
+import { listUrl, Range } from "@/lib/client";
 import { n, pct } from "@/lib/format";
+import { useData } from "@/lib/useData";
 import Icon from "./Icon";
 import { Errors, Loading, Sk } from "./ui";
 
@@ -29,28 +30,17 @@ function groups(k: string, list: any[]): Group[] {
 }
 
 export default function NurtureView({ ks, range, product, nonce, onBack }: Props) {
-  const [res, setRes] = useState<Record<string, any>>({});
-  const [pending, setPending] = useState<string[]>([]);
   const [mode, setMode] = useState("nurture");
   const [q, setQ] = useState("");
   const [shown, setShown] = useState(STEP);
-  const req = useRef(0), seen = useRef(nonce);
 
-  useEffect(() => {
-    const id = ++req.current, fresh = seen.current !== nonce;
-    seen.current = nonce;
-    setRes({}); setPending(ks);
-    ks.forEach((k) => getJson(listUrl("emails", k, range), fresh).then((d) => {
-      if (id !== req.current) return;
-      setRes((p) => ({ ...p, [k]: d })); setPending((p) => p.filter((x) => x !== k));
-    }));
-  }, [ks.join(), nonce]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => setShown(STEP), [mode, q, product, ks.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { res, pending } = useData(ks, (k) => listUrl("emails", k, range), nonce);
+  useEffect(() => setShown(STEP), [mode, q, product, ks.join(), range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const all = useMemo(() => {
     const t = q.trim().toLowerCase();
     return ks.flatMap((k) => groups(k, res[k]?.rows || []))
-      .filter((g) => (mode === "all" || (mode === "ab" ? g.rows.length > 1 : g.rows.some((r) => /nurture/i.test(r.name)))) && (!product || g.product === product))
+      .filter((g) => g.sent > 0 && (mode === "all" || (mode === "ab" ? g.rows.length > 1 : g.rows.some((r) => /nurture/i.test(r.name)))) && (!product || g.product === product))
       .filter((g) => !t || g.rows.some((r) => r.name.toLowerCase().includes(t)))
       .sort((a, b) => a.inst.localeCompare(b.inst) || a.rows[0].name.localeCompare(b.rows[0].name, "en", { numeric: true }));
   }, [res, ks, mode, q, product]);
@@ -71,10 +61,10 @@ export default function NurtureView({ ks, range, product, nonce, onBack }: Props
         <label className="search"><Icon name="search" size={16} /><input placeholder="Search by email name" value={q} onChange={(e) => setQ(e.target.value)} /></label>
         <div className="seg">{MODES.map(([k, l]) => <button key={k} className={mode === k ? "on" : ""} onClick={() => setMode(k)}>{l}</button>)}</div>
       </div>
-      <p className="note top">All numbers are all-time totals from Mautic. Unique clicks add up the unique clicks of each link in the email.</p>
+      <p className="note top">Sends in the selected dates, with the opens and email clicks of those sends. Emails that sent nothing in these dates are not shown.</p>
 
       {first && Array.from({ length: 3 }, (_, i) => <div className="card" key={i}><Sk w="30%" h={18} /><Sk w="100%" h={120} /></div>)}
-      {!first && all.length === 0 && <div className="card empty">No {label} found{product ? ` for ${product}` : ""}.</div>}
+      {!first && all.length === 0 && <div className="card empty">No {label} were sent in these dates{product ? ` for ${product}` : ""}.</div>}
       {all.slice(0, shown).map((g) => (
         <section className="card flush vgroup" key={g.key}>
           <div className="vg-h">
@@ -86,7 +76,7 @@ export default function NurtureView({ ks, range, product, nonce, onBack }: Props
           </div>
           <div className="table-wrap">
             <table className="tbl vtbl">
-              <thead><tr><th>Variant</th><th>Name</th><th className="num">Sent</th><th className="num">Read Count</th><th>Read Ratio</th><th className="num">Unique Clicks</th><th>Click Ratio</th><th className="num">Not Open</th><th className="num">Not Open %</th></tr></thead>
+              <thead><tr><th>Variant</th><th>Name</th><th className="num">Sent</th><th className="num">Read Count</th><th>Read Ratio</th><th className="num">Email Clicks</th><th>Click Ratio</th><th className="num">Not Open</th><th className="num">Not Open %</th></tr></thead>
               <tbody>{g.rows.map((r) => {
                 const read = r.sent ? r.opened / r.sent : 0, click = r.sent ? r.clicks / r.sent : 0, notOpen = Math.max(0, r.sent - r.opened);
                 return (

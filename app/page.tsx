@@ -2,8 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { INSTANCES } from "@/lib/instances";
 import { applyTheme, DEFAULT_THEME, THEMES } from "@/lib/themes";
-import { day, iso } from "@/lib/format";
-import { clearMemo, getJson, GROUP_NAMES, GROUPS, KEYS, overviewUrl } from "@/lib/client";
+import { day, lastWeeks } from "@/lib/format";
+import { clearMemo, getJson, GROUP_NAMES, GROUPS, KEYS, listUrl, newsletterUrl, overviewUrl, topUrl } from "@/lib/client";
+import { useData } from "@/lib/useData";
 import Icon from "@/components/Icon";
 import Overview from "@/components/Overview";
 import AllInstances from "@/components/AllInstances";
@@ -16,11 +17,11 @@ import { FormsTrend } from "@/components/OverviewSections";
 const NAV: [string, string, string][] = [
   ["overview", "Email Marketing Overview", "Overall email, newsletter, landing page and form performance across all Mautic instances"],
   ["instances", "All Instances", "Compare every Mautic instance side by side"],
-  ["newsletter", "Newsletter", "Every newsletter with sends, opens, clicks, bounces and unsubscribes (all time)"],
-  ["nurture", "Nurture Emails", "Each nurture email with its A/B/C/D variants side by side (all time)"],
-  ["emails", "Email Reports", "Every email with sends, opens and clicks (all time)"],
-  ["campaigns", "Campaigns", "Every campaign and its setup"],
-  ["pages", "Landing Pages", "Every landing page with visits (all time)"],
+  ["newsletter", "Newsletter", "Every newsletter sent in the selected dates, with its sends, opens, clicks, bounces and unsubscribes"],
+  ["nurture", "Nurture Emails", "Each nurture email with its A/B/C/D variants side by side, for the selected dates"],
+  ["emails", "Email Reports", "Every email with sends, opens and clicks in the selected dates"],
+  ["campaigns", "Campaigns", "Every campaign with its sends in the selected dates and its setup"],
+  ["pages", "Landing Pages", "Every landing page with visits in the selected dates"],
   ["forms", "Forms", "Every form with submissions in the selected dates, the previous period and all time"],
   ["export", "Export Reports", "Download the data as CSV files"],
 ];
@@ -36,15 +37,13 @@ export default function Page() {
   const [product, setProduct] = useState("");
   const [weeks, setWeeks] = useState<number | "custom">(2);
   const [custom, setCustom] = useState({ from: "", to: "" });
-  const [res, setRes] = useState<Record<string, any>>({});
-  const [pending, setPending] = useState<string[]>([]);
   const [nonce, setNonce] = useState(0);
   const [theme, setTheme] = useState(DEFAULT_THEME);
   const [sideOpen, setSideOpen] = useState(true);
   const [drawer, setDrawer] = useState(false);
   const [themeMenu, setThemeMenu] = useState(false);
   const [dateMenu, setDateMenu] = useState(false);
-  const req = useRef(0), seenNonce = useRef(0), themeBox = useRef<HTMLDivElement>(null), dateBox = useRef<HTMLDivElement>(null);
+  const themeBox = useRef<HTMLDivElement>(null), dateBox = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setTheme(load("theme", DEFAULT_THEME)); setSideOpen(load("sidebar", "open") === "open");
@@ -63,7 +62,7 @@ export default function Page() {
 
   const range = useMemo(() => {
     if (weeks === "custom") return custom;
-    const to = new Date(); return { from: iso(new Date(+to - weeks * 7 * 864e5 + 864e5)), to: iso(to) };
+    return lastWeeks(weeks);
   }, [weeks, custom]);
   const validRange = !!range.from && !!range.to && range.from <= range.to;
 
@@ -74,16 +73,24 @@ export default function Page() {
   const ks = view === "instances" || inst === "all" ? KEYS : group ? GROUPS[group] : [inst];
   const prod = single ? product : "";
 
+  const { res, pending } = useData(OVERVIEW_VIEWS.includes(view) && validRange ? ks : [], (k) => overviewUrl(k, range, prod), nonce);
+
+  // Every other page is loaded in the background for the same instances and dates, so opening it shows the data at once.
+  // It starts shortly after the visible page, so the visible page is asked for first (and gets the Refresh, when there is one).
+  const preload = useRef(0);
   useEffect(() => {
-    if (!OVERVIEW_VIEWS.includes(view) || !validRange) return;
-    const id = ++req.current, fresh = nonce !== seenNonce.current;
-    seenNonce.current = nonce;
-    setRes({}); setPending(ks);
-    ks.forEach((k) => getJson(overviewUrl(k, range, prod), fresh).then((d) => {
-      if (id !== req.current) return;
-      setRes((p) => ({ ...p, [k]: d })); setPending((p) => p.filter((x) => x !== k));
-    }));
-  }, [view, ks.join(), prod, range.from, range.to, nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!validRange) return;
+    const id = ++preload.current;
+    const steps: ((k: string) => string)[] = [(k) => overviewUrl(k, range, prod), topUrl, newsletterUrl,
+      ...["forms", "emails", "pages", "campaigns"].map((t) => (k: string) => listUrl(t, k, range))];
+    const t = setTimeout(async () => {
+      for (const url of steps) {
+        if (id !== preload.current) return;
+        await Promise.all(ks.map((k) => getJson(url(k))));
+      }
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [ks.join(), prod, range.from, range.to, nonce, validRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = (v: string) => { setView(v); setDrawer(false); history.replaceState(null, "", `#${v}`); window.scrollTo({ top: 0 }); };
   const pick = (x: string) => { setInst(x); setProduct(""); if (view === "instances") go("overview"); };
@@ -96,7 +103,6 @@ export default function Page() {
   const [, title, hint] = NAV.find((x) => x[0] === view)!;
   const scope = view === "instances" ? "All Instances" : prod ? `${INSTANCES[inst].short} · ${prod}` : inst === "all" ? `All Instances (${KEYS.length})` : group ? `${group} (${ks.length} instances)` : INSTANCES[inst].short;
   const products = single && Object.keys(INSTANCES[inst].products).length > 1 ? Object.keys(INSTANCES[inst].products) : [];
-  const usesDates = !["emails", "pages", "campaigns", "nurture", "newsletter"].includes(view);
   const details = (k: string) => { setInst(k); setProduct(""); go("nurture"); };
 
   return (
@@ -117,10 +123,10 @@ export default function Page() {
       <main className="main">
         <header className="top">
           <button className="ib" onClick={toggleSide} aria-label="Show or hide the menu" title="Show or hide the menu"><Icon name="menu" /></button>
-          <div className="ttl"><h1>{title}</h1><p>{scope}{usesDates && validRange && <> · {day(range.from, true)} – {day(range.to, true)}</>}</p></div>
+          <div className="ttl"><h1>{title}</h1><p>{scope}{validRange && <> · {day(range.from, true)} – {day(range.to, true)}</>}</p></div>
           <div className="tools">
             {/* Custom dates open in a small menu, so the header keeps the same width. */}
-            {usesDates && <div className="date-box" ref={dateBox}>
+            <div className="date-box" ref={dateBox}>
               <div className="seg">
                 {RANGES.map(([w, l]) => <button key={w} className={weeks === w ? "on" : ""} onClick={() => { setWeeks(w); setDateMenu(false); }}>{l}</button>)}
                 <button className={weeks === "custom" ? "on" : ""} aria-expanded={dateMenu} onClick={() => { if (weeks !== "custom") { setCustom(range); setWeeks("custom"); } setDateMenu(!dateMenu); }}>
@@ -133,7 +139,7 @@ export default function Page() {
                 <label>To<input type="date" value={custom.to} min={custom.from || undefined} onChange={(e) => setCustom({ ...custom, to: e.target.value })} /></label>
                 <button className="btn primary" onClick={() => setDateMenu(false)}>Done</button>
               </div>}
-            </div>}
+            </div>
             <button className="btn" onClick={() => { clearMemo(); setNonce(nonce + 1); }} title="Get new data from Mautic for every page"><Icon name="refresh" size={16} /> Refresh</button>
             <div className="theme-box" ref={themeBox}>
               <button className="btn" onClick={() => setThemeMenu(!themeMenu)} aria-expanded={themeMenu}><Icon name="palette" size={16} /> Theme</button>
@@ -149,7 +155,7 @@ export default function Page() {
           </div>
         </header>
 
-        {!validRange && usesDates && <div className="err">Please choose a start date and an end date. The start date must be before the end date.</div>}
+        {!validRange && <div className="err">Please choose a start date and an end date. The start date must be before the end date.</div>}
 
         {view !== "instances" && <div className="tabs" role="tablist">
           <div className="tg"><span className="tg-h">Combined</span>
@@ -162,7 +168,7 @@ export default function Page() {
               </div>
             </div>))}
         </div>}
-        {products.length > 1 && ["overview", "emails", "nurture", "export"].includes(view) && <div className="chips">
+        {products.length > 1 && ["overview", "emails", "nurture", "pages", "forms", "export"].includes(view) && <div className="chips">
           <span>Product:</span>
           <button className={!product ? "on" : ""} onClick={() => setProduct("")}>All products</button>
           {products.map((p) => <button key={p} className={product === p ? "on" : ""} onClick={() => setProduct(p)}>{p}</button>)}
@@ -173,8 +179,8 @@ export default function Page() {
         {view === "instances" && <AllInstances res={res} pending={pending} theme={theme} onOpen={(k) => { setInst(k); setProduct(""); go("overview"); }} onBack={() => go("overview")} />}
         {view === "forms" && validRange && <FormsTrend ks={ks} res={res} pending={pending} theme={theme} />}
         {["emails", "campaigns", "pages", "forms"].includes(view) && validRange && <ListView key={view} type={view} ks={ks} range={range} product={prod} nonce={nonce} />}
-        {view === "newsletter" && <NewsletterView ks={ks} theme={theme} nonce={nonce} onBack={() => go("overview")} />}
-        {view === "nurture" && <NurtureView ks={ks} range={range} product={prod} nonce={nonce} onBack={() => go("overview")} />}
+        {view === "newsletter" && validRange && <NewsletterView ks={ks} range={range} theme={theme} nonce={nonce} onBack={() => go("overview")} />}
+        {view === "nurture" && validRange && <NurtureView ks={ks} range={range} product={prod} nonce={nonce} onBack={() => go("overview")} />}
         {view === "export" && <ExportView ks={ks} res={res} pending={pending} range={range} product={prod} scope={scope} onPrint={() => { go("overview"); setTimeout(() => window.print(), 800); }} />}
       </main>
     </div>

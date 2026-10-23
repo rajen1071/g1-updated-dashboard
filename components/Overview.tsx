@@ -119,9 +119,11 @@ export default function Overview({ ks, res, pending, product, range, theme, nonc
           <h4 className="ig-h">{g}</h4>
           <div className="insts">{keys.map((x) => {
         const d = res[x], q = d?.kpi;
-        const top: [string, number | null, string][] = q ? [["Sent", q.sent, ""], ["Opens", q.opened, pct(q.opened, q.sent)], ["Email Clicks", q.clicks, pct(q.clicks, q.sent)]] : [];
-        const bottom: [string, number | null, string][] = q ? [["LP Visits", q.lp, pct(q.lp, q.sent)], ["Form Subs", q.forms, pct(q.forms, q.sent)], ["Bounced", q.bounced, pct(q.bounced, q.sent)], ["Unsubs", q.unsub, pct(q.unsub, q.sent)]] : [];
-        const cell = ([l, v, r]: [string, number | null, string]) => <div key={l} title={l === "LP Visits" ? "Landing Page Visits" : l === "Form Subs" ? "Form Submissions" : undefined}><small>{l}</small><b>{n(v)}</b>{r && <span>{r}</span>}</div>;
+        const top: [string, number | null, string][] = q ? [["Sent", q.sent, ""], ["Opens", q.opened, pct(q.opened, q.sent)], ["Clicks", q.clicks, pct(q.clicks, q.sent)]] : [];
+        const bottom: [string, number | null, string][] = q ? [["LP Visits", q.lp, pct(q.lp, q.sent)], ["Forms", q.forms, pct(q.forms, q.sent)], ["Bounces", q.bounced, pct(q.bounced, q.sent)], ["Unsubs", q.unsub, pct(q.unsub, q.sent)]] : [];
+        // Short labels keep four cards in one row; the full name shows on hover.
+        const full: Record<string, string> = { Clicks: "Email Clicks", "LP Visits": "Landing Page Visits", Forms: "Form Submissions", Bounces: "Bounced", Unsubs: "Unsubscribes" };
+        const cell = ([l, v, r]: [string, number | null, string]) => <div key={l} title={full[l]}><small>{l}</small><b>{n(v)}</b>{r && <span>{r}</span>}</div>;
         return (
           <div className="inst" key={x}>
             <div className="inst-h">
@@ -139,7 +141,7 @@ export default function Overview({ ks, res, pending, product, range, theme, nonc
         </section>))}
       </div>}
 
-      <OverviewSections ks={ks} range={range} nonce={nonce} onGo={onGo} />
+      <OverviewSections ks={ks} range={range} product={product} nonce={nonce} onGo={onGo} />
 
       <TopTables ks={ks} product={product} nonce={nonce} onGo={onGo} />
     </>

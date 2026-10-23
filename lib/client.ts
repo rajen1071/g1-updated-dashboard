@@ -6,11 +6,19 @@ export const GROUP_NAMES = Object.keys(GROUPS);
 export type Range = { from: string; to: string };
 
 // Answers are kept in memory while the tab is open, so moving between pages does not reload them.
+// A request that is still running is shared: a page that needs the same answer waits for it instead of asking again.
 const memo = new Map<string, any>();
+const running = new Map<string, Promise<any>>();
+export function getJson(url: string, fresh = false): Promise<any> {
+  if (!fresh && memo.has(url)) return Promise.resolve(memo.get(url));
+  if (!fresh && running.has(url)) return running.get(url)!;
+  const p = load(url, fresh).then((d) => { if (!d.error) memo.set(url, d); if (running.get(url) === p) running.delete(url); return d; });
+  running.set(url, p);
+  return p;
+}
 // When the server runs out of time (Vercel answers with a text page, not JSON) the request is tried again.
 // Each try continues from the parts the server already saved, so a later try usually succeeds.
-export async function getJson(url: string, fresh = false) {
-  if (!fresh && memo.has(url)) return memo.get(url);
+async function load(url: string, fresh: boolean) {
   let d: any;
   for (let a = 0; a < 3; a++) {
     d = await fetch(url + (fresh && a === 0 ? "&refresh=1" : "")).then(async (r) => {
@@ -20,16 +28,15 @@ export async function getJson(url: string, fresh = false) {
     if (!d.retry) break;
     await new Promise((r) => setTimeout(r, 2000));
   }
-  if (!d.error) memo.set(url, d);
   return d;
 }
 export const cached = (url: string) => memo.get(url);
 // Refresh forgets every saved answer in this tab, so no page shows numbers from before the Refresh.
-export const clearMemo = () => memo.clear();
+export const clearMemo = () => { memo.clear(); running.clear(); };
 export const overviewUrl = (k: string, r: Range, product = "") => `/api/overview?instance=${k}&from=${r.from}&to=${r.to}${product ? `&product=${encodeURIComponent(product)}` : ""}`;
 export const topUrl = (k: string) => `/api/top?instance=${k}`;
 export const newsletterUrl = (k: string) => `/api/newsletter?instance=${k}`;
-export const listUrl = (type: string, k: string, r: Range) => `/api/list?type=${type}&instance=${k}${type === "forms" ? `&from=${r.from}&to=${r.to}` : ""}`;
+export const listUrl = (type: string, k: string, r: Range) => `/api/list?type=${type}&instance=${k}&from=${r.from}&to=${r.to}`;
 
 const FIELDS = ["sent", "opened", "clicks", "lp", "forms", "bounced", "unsub"] as const;
 export type Kpi = Record<(typeof FIELDS)[number], number | null>;

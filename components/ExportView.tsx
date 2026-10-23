@@ -30,7 +30,7 @@ export default function ExportView({ ks, res, pending, range, product, scope, on
     setErrs(all.map(([, d]) => d.error).filter(Boolean));
     const cols = LISTS[type].cols.filter((c) => c.k !== "rate" && c.k !== "change");
     const rows = all.flatMap(([k, d]) => (d.rows || []).filter((r: any) => !product || r.product === product).map((r: any) => [INSTANCES[k].short, r.id, ...cols.map((c) => r[c.k]), ...(type === "emails" ? [r.subject] : [])]));
-    downloadCsv(`${type}_${type === "forms" ? tag : scope.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.csv`, [["Instance", "ID", ...cols.map((c) => c.label), ...(type === "emails" ? ["Subject"] : [])], ...rows]);
+    downloadCsv(`${type}_${tag}.csv`, [["Instance", "ID", ...cols.map((c) => c.label), ...(type === "emails" ? ["Subject"] : [])], ...rows]);
   };
 
   const newsletters = async () => {
@@ -45,10 +45,10 @@ export default function ExportView({ ks, res, pending, range, product, scope, on
   const items: [string, string, string, string, () => void, boolean][] = [
     ["summary", "Summary by instance", "Totals for each instance for the selected dates: sent, opens, clicks, visits, forms, bounces and unsubscribes.", "overview", summary, ready],
     ["trend", "Performance trend", "The same numbers split by day (or by week for long date ranges).", "export", trend, ready],
-    ["emails", "Email list", "Every published email with product, category, and all-time sends, opens and unique clicks.", "emails", () => list("emails"), true],
+    ["emails", "Email list", "Every published email with product, category, and sends, opens and email clicks in the selected dates.", "emails", () => list("emails"), true],
     ["newsletter", "Newsletter list", "Every newsletter with send date and all-time sends, opens, unique clicks, visits, bounces and unsubscribes.", "newsletter", newsletters, true],
-    ["campaigns", "Campaign list", "Every published campaign with steps, segments and forms.", "campaigns", () => list("campaigns"), true],
-    ["pages", "Landing page list", "Every published landing page with all-time visits.", "pages", () => list("pages"), true],
+    ["campaigns", "Campaign list", "Every published campaign with sends and email clicks in the selected dates, steps, segments and forms.", "campaigns", () => list("campaigns"), true],
+    ["pages", "Landing page list", "Every published landing page with visits in the selected dates and all-time totals.", "pages", () => list("pages"), true],
     ["forms", "Form list", "Every published form with the number of submissions in the selected dates.", "forms", () => list("forms"), true],
   ];
 

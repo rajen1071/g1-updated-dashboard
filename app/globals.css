@@ -282,9 +282,8 @@ input[type=date]{height:38px;padding:0 10px;border:1px solid var(--border);borde
 .tbl.compact td:first-child{color:var(--muted)}
 .nm{display:block;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
 
-@media(min-width:1700px){.kpis.eight{grid-template-columns:repeat(8,minmax(0,1fr))}}
-@media(max-width:1500px){.grid-3{grid-template-columns:1fr}.nm{max-width:320px}}
-@media(max-width:1300px){.row-charts{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.row-charts>.trend{grid-column:1/-1}}
+@container (min-width:1400px){.kpis.eight{grid-template-columns:repeat(8,minmax(0,1fr))}}
+@container (max-width:1099.98px){.row-charts{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.row-charts>.trend{grid-column:1/-1}}
 @media(max-width:900px){.kpis.eight,.row-charts{grid-template-columns:minmax(0,1fr)}}
 @media(min-width:601px) and (max-width:900px){.kpis.eight{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.kpis.eight{grid-template-columns:1fr 1fr}.kpis.eight .kpi-i{display:none}.chg span{display:none}.mini.four{grid-template-columns:1fr 1fr}}
@@ -299,7 +298,7 @@ input[type=date]{height:38px;padding:0 10px;border:1px solid var(--border);borde
 .inst-groups{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px}
 .ig{flex:1 1 0;min-width:0}
 .ig .insts{grid-template-columns:repeat(var(--n),minmax(0,1fr));margin-bottom:0}
-@media(max-width:1200px){.ig{flex-basis:100%!important}.ig .insts{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}}
+@container (max-width:899.98px){.ig{flex-basis:100%!important}.ig .insts{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}}
 .tbl .row-grp td{background:var(--surface);color:var(--primary);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;padding-top:14px}
 .tbl .row-sum td{background:var(--surface2);font-weight:500}
 
@@ -379,3 +378,31 @@ input[type=date]{height:38px;padding:0 10px;border:1px solid var(--border);borde
   input,select{font-size:16px!important}
 }
 @media(max-width:380px){.kpis.eight .kpi b{font-size:19px}.mini b{font-size:14px}}
+
+/* Layouts follow the width of the dashboard itself, not the browser window, so they also fit when the
+   dashboard is shown inside another page (for example in a Mautic iframe) or with Windows display scaling. */
+.main{container-type:inline-size}
+.grid-3{grid-template-columns:minmax(0,1fr)}
+@container (min-width:1100px){.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container (min-width:700px) and (max-width:1099.98px){.grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3>.card:last-child:nth-child(odd){grid-column:1/-1}}
+.top-tbl td.name{width:46%;max-width:0}
+.top-tbl .nm{max-width:100%}
+.nm-cell small{display:block;color:var(--muted);font-size:11px;margin-top:1px}
+.top-tbl th.num{white-space:normal}
+.prod-t small{white-space:nowrap}
+
+/* Instance cards: compact enough that all four fit in one row on laptop screens and inside the Mautic iframe */
+.inst{padding:14px}
+.inst-t{gap:8px}
+.inst-logo{width:34px;height:34px;border-radius:9px}
+.inst-logo img{width:20px;height:20px}
+.inst-h b{font-size:14px}
+.inst-h small{font-size:11.5px}
+.inst .mini{gap:6px}
+.inst .mini div{padding:7px 8px}
+.inst .mini.four small{font-size:10.5px}
+@container (min-width:900px) and (max-width:1149.98px){
+  .inst-logo,.inst-h .link svg{display:none}
+  .inst-h b{font-size:13.5px}
+  .inst .mini.four{grid-template-columns:1fr 1fr}
+}

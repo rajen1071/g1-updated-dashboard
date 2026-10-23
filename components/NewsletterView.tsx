@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { INSTANCES } from "@/lib/instances";
 import { THEMES } from "@/lib/themes";
-import { getJson, newsletterUrl } from "@/lib/client";
+import { newsletterUrl, Range } from "@/lib/client";
+import { useData } from "@/lib/useData";
 import { day, n, pct } from "@/lib/format";
 import Icon from "./Icon";
 import { tip } from "./Overview";
@@ -15,28 +15,19 @@ const rate = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : 0)
 
 // Newsletters of the selected instances, newest first (all-time numbers from Mautic).
 export function useNewsletters(ks: string[], nonce: number) {
-  const [res, setRes] = useState<Record<string, any>>({});
-  const [pending, setPending] = useState<string[]>([]);
-  const req = useRef(0), seen = useRef(nonce);
-  useEffect(() => {
-    const id = ++req.current, fresh = seen.current !== nonce;
-    seen.current = nonce;
-    setRes({}); setPending(ks);
-    ks.forEach((k) => getJson(newsletterUrl(k), fresh).then((d) => {
-      if (id !== req.current) return;
-      setRes((p) => ({ ...p, [k]: d })); setPending((p) => p.filter((x) => x !== k));
-    }));
-  }, [ks.join(), nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { res, pending } = useData(ks, newsletterUrl, nonce);
   const rows: any[] = ks.flatMap((k) => (res[k]?.rows || []).map((r: any) => ({ ...r, inst: k }))).sort((a, b) => b.date.localeCompare(a.date));
   return { rows, pending, errs: ks.map((k) => res[k]?.error).filter(Boolean) as string[] };
 }
 
-type Props = { ks: string[]; theme: string; nonce: number; onBack: () => void };
+type Props = { ks: string[]; range: Range; theme: string; nonce: number; onBack: () => void };
 
-export default function NewsletterView({ ks, theme, nonce, onBack }: Props) {
+export default function NewsletterView({ ks, range, theme, nonce, onBack }: Props) {
   const c = THEMES[theme].v;
-  const { rows, pending, errs } = useNewsletters(ks, nonce);
-  const first = pending.length > 0 && !rows.length;
+  const { rows: all, pending, errs } = useNewsletters(ks, nonce);
+  // Newsletters sent in the selected dates; their numbers are all-time totals (opens and clicks keep coming in after the send).
+  const rows = all.filter((r) => r.date.slice(0, 10) >= range.from && r.date.slice(0, 10) <= range.to);
+  const first = pending.length > 0 && !all.length;
   const sum = (f: string) => rows.reduce((a, r) => a + r[f], 0);
   const sent = sum("sent"), opened = sum("opened"), clicks = sum("clicks");
   const chart = [...rows].reverse().map((r) => ({ name: nlTitle(r.name).replace(/ newsletter$/i, ""), Sent: r.sent, Opened: r.opened, "Unique Clicks": r.clicks,
@@ -54,7 +45,7 @@ export default function NewsletterView({ ks, theme, nonce, onBack }: Props) {
         <div className="kpi" key={l}><small>{l}</small>{first ? <Sk w="60%" h={26} /> : <b>{v}</b>}</div>))}
       </div>
 
-      {!first && !rows.length ? <div className="card empty">No newsletters found{ks.length === 1 ? ` in ${INSTANCES[ks[0]].short}` : ""}. Newsletters are emails with &quot;Newsletter&quot; in their name.</div> : <>
+      {!first && !rows.length ? <div className="card empty">No newsletter was sent in these dates{ks.length === 1 ? ` from ${INSTANCES[ks[0]].short}` : ""}.{all.length > 0 && <> The latest one went out on {day(all[0].date, true)}. Choose more weeks or custom dates to see it.</>}</div> : <>
         <div className="grid-1-1">
           <Card title="Sent, Opened and Clicked" sub="Each newsletter, oldest to newest">
             {first ? <Sk w="100%" h={240} /> :
@@ -88,7 +79,7 @@ export default function NewsletterView({ ks, theme, nonce, onBack }: Props) {
           </Card>
         </div>
 
-        <Card title="All Newsletters" sub="Newest first. All-time numbers from Mautic, so they do not change with the selected dates." className="flush">
+        <Card title="All Newsletters" sub="Newsletters sent in the selected dates, newest first. Numbers are all-time totals for each newsletter." className="flush">
           <div className="table-wrap">
             <table className="tbl">
               <thead><tr>{head.map((h, i) => <th key={h} className={i > (multi ? 2 : 1) ? "num" : ""}>{h}</th>)}</tr></thead>

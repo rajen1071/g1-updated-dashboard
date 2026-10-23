@@ -1,9 +1,9 @@
+import { cacheGet, cacheSet } from "@/lib/cache";
 import { INSTANCES } from "@/lib/instances";
 import { count, hidden, productOf, runPool, W } from "@/lib/mautic";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-const cache = new Map<string, { at: number; data: any }>();
 const fmt = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
 
 function idsByProduct(key: string, list: any[]) {
@@ -16,9 +16,9 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams;
   const key = q.get("instance") || "", product = q.get("product") || "", from = q.get("from") || "", to = q.get("to") || "";
   if (!INSTANCES[key] || !from || !to) return Response.json({ error: "bad params" }, { status: 400 });
-  const ck = [key, product, from, to].join("|");
-  const hit = cache.get(ck);
-  if (hit && Date.now() - hit.at < 900_000 && !q.get("refresh")) return Response.json({ ...hit.data, cached: true });
+  const ck = ["overview", key, product, from, to].join("|");
+  const hit = await cacheGet(ck, !!q.get("refresh"));
+  if (hit) return Response.json({ ...hit, cached: true });
   try {
     // Unpublished and test emails, pages and forms are left out of every count.
     const multi = Object.keys(INSTANCES[key].products).length > 1;
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
     if (products.length && gap("sent") > 0) products.push({ name: "Deleted emails", sent: gap("sent"), opened: Math.max(0, gap("opened")) });
     const prev = { sent: pv[0], opened: pv[1], clicks: pv[2], lp: pv[3], forms: pv[4], bounced: pv[5], unsub: pv[6] };
     const data = { series: series.map((s) => ({ ...s, lp: Math.max(0, s.lp), forms: Math.max(0, s.forms) })), kpi, prev, products };
-    cache.set(ck, { at: Date.now(), data });
+    await cacheSet(ck, data);
     return Response.json(data);
   } catch (e: any) {
     return Response.json({ error: `${INSTANCES[key].label}: ${e.message}` }, { status: 502 });

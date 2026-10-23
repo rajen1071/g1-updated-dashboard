@@ -7,6 +7,7 @@ const P: Record<string, string> = {
   campaigns: "M4 21V4M4 4h12l-2 4 2 4H4",
   pages: "M4 3h16v18H4zM4 8h16M9 8v13",
   forms: "M8 3h8v3H8zM6 5H5v16h14V5h-1M9 11h6M9 15h6",
+  newsletter: "M4 4h13v16H6a2 2 0 0 1-2-2zM17 8h3v10a2 2 0 0 1-2 2M8 8h5M8 12h5M8 16h5",
   export: "M12 3v12M7 10l5 5 5-5M4 19h16",
   menu: "M4 6h16M4 12h16M4 18h16",
   close: "M6 6l12 12M18 6L6 18",

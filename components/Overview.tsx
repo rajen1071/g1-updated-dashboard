@@ -3,24 +3,25 @@ import { Fragment, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { INSTANCES } from "@/lib/instances";
 import { THEMES } from "@/lib/themes";
-import { combine, GROUP_NAMES, GROUPS, productRows } from "@/lib/client";
+import { combine, GROUP_NAMES, GROUPS, Range } from "@/lib/client";
 import { day, n, pct } from "@/lib/format";
 import Icon from "./Icon";
+import OverviewSections from "./OverviewSections";
 import TopTables from "./TopTables";
 import { Card, Errors, Loading, Sk } from "./ui";
 
-type Props = { ks: string[]; res: Record<string, any>; pending: string[]; product: string; theme: string; nonce: number; onOpen: (k: string) => void; onGo: (view: string) => void };
+type Props = { ks: string[]; res: Record<string, any>; pending: string[]; product: string; range: Range; theme: string; nonce: number; onOpen: (k: string) => void; onGo: (view: string) => void };
 export const tip = { contentStyle: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, color: "var(--text)", boxShadow: "var(--shadow)" }, labelStyle: { fontWeight: 600, marginBottom: 4 } };
 
 // Change against the previous period of the same length. upIsGood=false for bounces and unsubscribes.
-function Change({ cur, prev, upIsGood = true }: { cur: number | null; prev: number | null; upIsGood?: boolean }) {
+export function Change({ cur, prev, upIsGood = true }: { cur: number | null; prev: number | null; upIsGood?: boolean }) {
   if (cur == null || prev == null) return null;
   if (!prev) return <em className="chg flat" title="No data in the previous period">{cur ? "New" : "No change"}</em>;
   const d = ((cur - prev) / prev) * 100;
   return <em className={`chg ${Math.abs(d) < 0.05 ? "flat" : d > 0 === upIsGood ? "good" : "bad"}`} title={`Previous period: ${n(prev)}`}>{d >= 0 ? "↑" : "↓"} {Math.abs(d).toFixed(1)}%<span> vs prev. period</span></em>;
 }
 
-export default function Overview({ ks, res, pending, product, theme, nonce, onOpen, onGo }: Props) {
+export default function Overview({ ks, res, pending, product, range, theme, nonce, onOpen, onGo }: Props) {
   const c = THEMES[theme].v;
   const { ok, kpi: k, prev, series, delivered } = combine(ks.map((x) => res[x]));
   const errs = ks.map((x) => res[x]?.error).filter(Boolean);
@@ -48,9 +49,8 @@ export default function Overview({ ks, res, pending, product, theme, nonce, onOp
     ["Landing Page Visits", k.lp, `${pct(k.lp, k.clicks)} (of email clicks)`, c.c4],
     ["Form Submissions", k.forms, `${pct(k.forms, k.lp)} (of page visits)`, c.good],
   ];
-  const prods = ks.flatMap((x) => productRows(x, res[x])).filter((p: any) => !product || p.name === product);
-  // Instance cards and products are shown in two brand sections: Altametrics and Plum.
-  const groups = GROUP_NAMES.map((g) => ({ g, keys: GROUPS[g].filter((x) => ks.includes(x)), prods: prods.filter((p: any) => INSTANCES[p.inst].group === g) })).filter((x) => x.keys.length);
+  // Instance cards are shown in two brand sections: Altametrics and Plum.
+  const groups = GROUP_NAMES.map((g) => ({ g, keys: GROUPS[g].filter((x) => ks.includes(x)) })).filter((x) => x.keys.length);
 
   return (
     <>
@@ -127,7 +127,7 @@ export default function Overview({ ks, res, pending, product, theme, nonce, onOp
             <div className="inst-h">
               <div className="inst-t">
                 {INSTANCES[x].icon && <span className="inst-logo"><img src={INSTANCES[x].icon} alt="" /></span>}
-                <div><b>{INSTANCES[x].label}</b><small>{Object.keys(INSTANCES[x].products).join(", ")}</small></div>
+                <div><b title={INSTANCES[x].label}>{INSTANCES[x].label}</b><small title={Object.keys(INSTANCES[x].products).join(", ")}>{Object.keys(INSTANCES[x].products).join(", ")}</small></div>
               </div>
               <button className="link" onClick={() => onOpen(x)}>View Details <Icon name="right" size={14} /></button>
             </div>
@@ -139,25 +139,9 @@ export default function Overview({ ks, res, pending, product, theme, nonce, onOp
         </section>))}
       </div>}
 
-      <TopTables ks={ks} product={product} nonce={nonce} onGo={onGo} />
+      <OverviewSections ks={ks} range={range} nonce={nonce} onGo={onGo} />
 
-      <Card title="Product Performance" sub="Emails sent and opened for each product in the selected dates, by brand">
-        {first ? <Sk w="100%" h={180} /> : prods.length === 0 ? <p className="empty">No product data for these dates.</p> :
-          <div className="prod-groups">{groups.filter((x) => x.prods.length).map(({ g, prods: ps }) => {
-            const sent = ps.reduce((a: number, p: any) => a + (p.sent || 0), 0), opened = ps.reduce((a: number, p: any) => a + (p.opened || 0), 0);
-            const max = Math.max(1, ...ps.map((p: any) => p.sent || 0));
-            return (
-              <div className="pg" key={g}>
-                <div className="pg-h"><b>{g}</b><span>{n(sent)} sent · {pct(opened, sent)} open rate</span></div>
-                <div className="prods">{ps.map((p: any) => (
-                  <div className="prod" key={p.inst + p.name}>
-                    <div className="prod-t"><b>{p.name}</b><small>{INSTANCES[p.inst].short}</small><span>{pct(p.opened, p.sent)} open rate</span></div>
-                    <div className="f-bar"><i style={{ width: `${((p.sent || 0) / max) * 100}%`, background: c.c1 }} /></div>
-                    <small>{n(p.sent)} sent · {n(p.opened)} opened</small>
-                  </div>))}</div>
-              </div>);
-          })}</div>}
-      </Card>
+      <TopTables ks={ks} product={product} nonce={nonce} onGo={onGo} />
     </>
   );
 }

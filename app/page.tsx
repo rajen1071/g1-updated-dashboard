@@ -3,26 +3,29 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { INSTANCES } from "@/lib/instances";
 import { applyTheme, DEFAULT_THEME, THEMES } from "@/lib/themes";
 import { day, iso } from "@/lib/format";
-import { getJson, GROUP_NAMES, GROUPS, KEYS, overviewUrl } from "@/lib/client";
+import { clearMemo, getJson, GROUP_NAMES, GROUPS, KEYS, overviewUrl } from "@/lib/client";
 import Icon from "@/components/Icon";
 import Overview from "@/components/Overview";
 import AllInstances from "@/components/AllInstances";
 import ListView from "@/components/ListView";
 import ExportView from "@/components/ExportView";
 import NurtureView from "@/components/NurtureView";
+import NewsletterView from "@/components/NewsletterView";
+import { FormsTrend } from "@/components/OverviewSections";
 
 const NAV: [string, string, string][] = [
-  ["overview", "Email Marketing Overview", "Overall email, landing page and form performance across all Mautic instances"],
+  ["overview", "Email Marketing Overview", "Overall email, newsletter, landing page and form performance across all Mautic instances"],
   ["instances", "All Instances", "Compare every Mautic instance side by side"],
+  ["newsletter", "Newsletter", "Every newsletter with sends, opens, clicks, bounces and unsubscribes (all time)"],
   ["nurture", "Nurture Emails", "Each nurture email with its A/B/C/D variants side by side (all time)"],
   ["emails", "Email Reports", "Every email with sends, opens and clicks (all time)"],
   ["campaigns", "Campaigns", "Every campaign and its setup"],
   ["pages", "Landing Pages", "Every landing page with visits (all time)"],
-  ["forms", "Forms", "Every form with submissions in the selected dates"],
+  ["forms", "Forms", "Every form with submissions in the selected dates, the previous period and all time"],
   ["export", "Export Reports", "Download the data as CSV files"],
 ];
 const RANGES: [number, string][] = [[1, "1 Week"], [2, "2 Weeks"], [4, "4 Weeks"], [8, "8 Weeks"]];
-const OVERVIEW_VIEWS = ["overview", "instances", "export"];
+const OVERVIEW_VIEWS = ["overview", "instances", "forms", "export"];
 
 function load(k: string, d: string) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }
 function save(k: string, v: string) { try { localStorage.setItem(k, v); } catch {} }
@@ -93,7 +96,7 @@ export default function Page() {
   const [, title, hint] = NAV.find((x) => x[0] === view)!;
   const scope = view === "instances" ? "All Instances" : prod ? `${INSTANCES[inst].short} · ${prod}` : inst === "all" ? `All Instances (${KEYS.length})` : group ? `${group} (${ks.length} instances)` : INSTANCES[inst].short;
   const products = single && Object.keys(INSTANCES[inst].products).length > 1 ? Object.keys(INSTANCES[inst].products) : [];
-  const usesDates = !["emails", "pages", "campaigns", "nurture"].includes(view);
+  const usesDates = !["emails", "pages", "campaigns", "nurture", "newsletter"].includes(view);
   const details = (k: string) => { setInst(k); setProduct(""); go("nurture"); };
 
   return (
@@ -131,7 +134,7 @@ export default function Page() {
                 <button className="btn primary" onClick={() => setDateMenu(false)}>Done</button>
               </div>}
             </div>}
-            <button className="btn" onClick={() => setNonce(nonce + 1)} title="Get new data from Mautic"><Icon name="refresh" size={16} /> Refresh</button>
+            <button className="btn" onClick={() => { clearMemo(); setNonce(nonce + 1); }} title="Get new data from Mautic for every page"><Icon name="refresh" size={16} /> Refresh</button>
             <div className="theme-box" ref={themeBox}>
               <button className="btn" onClick={() => setThemeMenu(!themeMenu)} aria-expanded={themeMenu}><Icon name="palette" size={16} /> Theme</button>
               {themeMenu && <div className="menu">
@@ -154,8 +157,8 @@ export default function Page() {
           {GROUP_NAMES.map((g) => (
             <div className="tg" key={g} style={{ flexGrow: GROUPS[g].length + (GROUPS[g].length > 1 ? 1 : 0) }}><span className="tg-h">{g}</span>
               <div className="tg-row">
-                {GROUPS[g].length > 1 && <button className={`tab ${inst === `group:${g}` ? "on" : ""}`} onClick={() => pick(`group:${g}`)}><b>{g} (all {GROUPS[g].length})</b><small>{GROUPS[g].flatMap((x) => Object.keys(INSTANCES[x].products)).join(", ")}</small></button>}
-                {GROUPS[g].map((x) => <button key={x} className={`tab ${inst === x ? "on" : ""}`} onClick={() => pick(x)}><b>{INSTANCES[x].label}</b><small>{Object.keys(INSTANCES[x].products).join(", ")}</small></button>)}
+                {GROUPS[g].length > 1 && <button className={`tab ${inst === `group:${g}` ? "on" : ""}`} onClick={() => pick(`group:${g}`)}><b>{g} (all {GROUPS[g].length})</b><small title={GROUPS[g].flatMap((x) => Object.keys(INSTANCES[x].products)).join(", ")}>{GROUPS[g].flatMap((x) => Object.keys(INSTANCES[x].products)).join(", ")}</small></button>}
+                {GROUPS[g].map((x) => <button key={x} className={`tab ${inst === x ? "on" : ""}`} onClick={() => pick(x)}><b>{INSTANCES[x].label}</b><small title={Object.keys(INSTANCES[x].products).join(", ")}>{Object.keys(INSTANCES[x].products).join(", ")}</small></button>)}
               </div>
             </div>))}
         </div>}
@@ -166,9 +169,11 @@ export default function Page() {
         </div>}
 
         <p className="hint">{hint}</p>
-        {view === "overview" && <Overview ks={ks} res={res} pending={pending} product={prod} theme={theme} nonce={nonce} onOpen={details} onGo={go} />}
+        {view === "overview" && <Overview ks={ks} res={res} pending={pending} product={prod} range={range} theme={theme} nonce={nonce} onOpen={details} onGo={go} />}
         {view === "instances" && <AllInstances res={res} pending={pending} theme={theme} onOpen={(k) => { setInst(k); setProduct(""); go("overview"); }} onBack={() => go("overview")} />}
+        {view === "forms" && validRange && <FormsTrend ks={ks} res={res} pending={pending} theme={theme} />}
         {["emails", "campaigns", "pages", "forms"].includes(view) && validRange && <ListView key={view} type={view} ks={ks} range={range} product={prod} nonce={nonce} />}
+        {view === "newsletter" && <NewsletterView ks={ks} theme={theme} nonce={nonce} onBack={() => go("overview")} />}
         {view === "nurture" && <NurtureView ks={ks} range={range} product={prod} nonce={nonce} onBack={() => go("overview")} />}
         {view === "export" && <ExportView ks={ks} res={res} pending={pending} range={range} product={prod} scope={scope} onPrint={() => { go("overview"); setTimeout(() => window.print(), 800); }} />}
       </main>

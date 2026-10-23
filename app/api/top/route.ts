@@ -1,9 +1,9 @@
+import { cacheGet, cacheSet } from "@/lib/cache";
 import { INSTANCES } from "@/lib/instances";
 import { count, isLive, listAll, productOf, runPool, uniqueClicks } from "@/lib/mautic";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-const cache = new Map<string, { at: number; data: any }>();
 const TOP = 5;
 const rank = <T,>(list: T[], f: (x: T) => number) => [...list].sort((a, b) => f(b) - f(a)).slice(0, TOP);
 
@@ -44,11 +44,12 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams;
   const key = q.get("instance") || "";
   if (!INSTANCES[key]) return Response.json({ error: "bad params" }, { status: 400 });
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < 900_000 && !q.get("refresh")) return Response.json({ ...hit.data, cached: true });
+  const ck = `top|${key}`;
+  const hit = await cacheGet(ck, !!q.get("refresh"));
+  if (hit) return Response.json({ ...hit, cached: true });
   try {
     const data = await top(key, !!q.get("refresh"));
-    cache.set(key, { at: Date.now(), data });
+    await cacheSet(ck, data);
     return Response.json(data);
   } catch (e: any) {
     return Response.json({ error: `${INSTANCES[key].label}: ${e.message}` }, { status: 502 });

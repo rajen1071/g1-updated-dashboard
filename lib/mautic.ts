@@ -1,3 +1,4 @@
+import { refreshedAt } from "./cache";
 import { INSTANCES } from "./instances";
 const tok: Record<string, { t: string; exp: number }> = {};
 export type W = { col: string; expr: string; val: string | number };
@@ -36,12 +37,12 @@ export async function runPool<T>(tasks: (() => Promise<T>)[], n = 8): Promise<T[
   return out;
 }
 
-// Full list of emails / pages / forms / campaigns, cached for 1 hour.
+// Full list of emails / pages / forms / campaigns, kept until the next Refresh click.
 // minimal=true skips the HTML body (about 50x smaller), but also drops counters like sentCount.
 const listCache = new Map<string, { at: number; list: any[] }>();
 export async function listAll(key: string, path: string, minimal: boolean, fresh = false) {
   const ck = `${key}|${path}|${minimal}`, c = listCache.get(ck);
-  if (c && !fresh && Date.now() - c.at < 3_600_000) return c.list;
+  if (c && !fresh && c.at > refreshedAt()) return c.list;
   const size = minimal ? 500 : 100, out: any[] = [];
   for (let s = 0; ; s += size) {
     const d = await mget(key, path, { limit: size, start: s, orderBy: "id", orderByDir: "asc", ...(minimal ? { minimal: 1 } : {}) });
@@ -57,7 +58,7 @@ export async function listAll(key: string, path: string, minimal: boolean, fresh
 const variantCache = new Map<string, { at: number; list: any[] }>();
 async function missingEmails(key: string, list: any[], fresh: boolean) {
   const c = variantCache.get(key);
-  if (c && !fresh && Date.now() - c.at < 3_600_000) return c.list;
+  if (c && !fresh && c.at > refreshedAt()) return c.list;
   const have = new Set(list.map((e) => Number(e.id))), max = Math.max(0, ...have), found: any[] = [];
   const get = (id: number) => () => mget(key, `emails/${id}`).then((d) => d.email || null).catch(() => null);
   const ids = Array.from({ length: max }, (_, i) => i + 1).filter((id) => !have.has(id));
@@ -73,7 +74,7 @@ async function missingEmails(key: string, list: any[], fresh: boolean) {
 const clickCache = new Map<string, { at: number; m: Record<string, number> }>();
 export async function uniqueClicks(key: string, fresh: boolean) {
   const c = clickCache.get(key);
-  if (c && !fresh && Date.now() - c.at < 3_600_000) return c.m;
+  if (c && !fresh && c.at > refreshedAt()) return c.m;
   const m: Record<string, number> = {};
   for (let s = 0; ; ) {
     const d = await mget(key, "stats/channel_url_trackables", { limit: 1000, start: s, "where[0][col]": "channel", "where[0][expr]": "eq", "where[0][val]": "email" });

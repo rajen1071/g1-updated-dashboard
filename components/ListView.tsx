@@ -4,6 +4,7 @@ import { INSTANCES } from "@/lib/instances";
 import { getJson, listUrl, Range } from "@/lib/client";
 import { day, n, pct } from "@/lib/format";
 import Icon from "./Icon";
+import { Change } from "./Overview";
 import { Card, Errors, Loading, Sk } from "./ui";
 
 type Col = { k: string; label: string; num?: boolean; get?: (r: any) => any; show?: (r: any) => React.ReactNode };
@@ -31,9 +32,13 @@ export const LISTS: Record<string, { label: string; note: string; cols: Col[]; s
     stats: (r) => [["Landing pages", n(r.length)], ["With visits", n(r.filter((x) => x.hits > 0).length)], ["Total visits (all time)", n(r.reduce((a, x) => a + x.hits, 0))], ["Unique visits (all time)", n(r.reduce((a, x) => a + x.unique, 0))]],
   },
   forms: {
-    label: "forms", sort: "submissions", note: "Submissions are counted for the selected dates only.",
-    cols: [name(), { k: "category", label: "Category", show: (r) => r.category || "—" }, { k: "submissions", label: "Submissions", num: true, show: (r) => n(r.submissions) }, modified],
-    stats: (r) => [["Forms", n(r.length)], ["Submissions (selected dates)", n(r.reduce((a, x) => a + x.submissions, 0))], ["Forms with submissions", n(r.filter((x) => x.submissions > 0).length)], ["Forms without submissions", n(r.filter((x) => !x.submissions).length)]],
+    label: "forms", sort: "submissions", note: "Submissions are counted for the selected dates, for the same number of days just before them, and for all time.",
+    cols: [name(), { k: "category", label: "Category", show: (r) => r.category || "—" }, { k: "submissions", label: "Submissions", num: true, show: (r) => n(r.submissions) },
+      { k: "prev", label: "Previous Period", num: true, show: (r) => n(r.prev) },
+      { k: "change", label: "Change", num: true, get: (r) => (r.prev ? (r.submissions - r.prev) / r.prev : r.submissions ? 1e9 : -1e9), show: (r) => <Change cur={r.submissions} prev={r.prev} /> },
+      { k: "total", label: "All Time", num: true, show: (r) => n(r.total) }, modified],
+    stats: (r) => { const s = r.reduce((a, x) => a + x.submissions, 0); return [["Forms with submissions", `${n(r.filter((x) => x.submissions > 0).length)} of ${n(r.length)}`], ["Submissions (selected dates)", n(s)],
+      ["Submissions (previous period)", n(r.reduce((a, x) => a + (x.prev || 0), 0))], ["Submissions (all time)", n(r.reduce((a, x) => a + (x.total || 0), 0))]]; },
   },
 };
 const PAGE = 25;

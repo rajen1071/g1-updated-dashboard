@@ -44,7 +44,9 @@ export default function AllInstances({ res, pending, theme, onOpen, onBack }: Pr
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chart} margin={{ top: 8, right: 8, left: -8, bottom: 0 }} barGap={4}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={c.border} />
-              <XAxis dataKey="name" fontSize={12} tick={{ fill: c.muted }} axisLine={{ stroke: c.border }} tickLine={false} />
+              {/* Names are split into one word per line, so every instance name stays readable on a phone. */}
+              <XAxis dataKey="name" interval={0} height={36} axisLine={{ stroke: c.border }} tickLine={false}
+                tick={({ x, y, payload }: any) => <text x={x} y={y + 12} textAnchor="middle" fontSize={12} fill={c.muted}>{String(payload.value).split(" ").map((w, i) => <tspan key={i} x={x} dy={i ? 13 : 0}>{w}</tspan>)}</text>} />
               <YAxis fontSize={11} tick={{ fill: c.muted }} axisLine={false} tickLine={false} tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 100) / 10}k` : v)} />
               <Tooltip {...tip} cursor={{ fill: c.surface2 }} formatter={(v: number) => n(v)} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: c.muted }} />
@@ -68,7 +70,7 @@ export default function AllInstances({ res, pending, theme, onOpen, onBack }: Pr
                 return (
                   <Fragment key={k}>
                     <tr className="row-main" onClick={() => q && toggle(k)}>
-                      <td><div className="cell-name"><span className={`chev ${isOpen ? "on" : ""}`}><Icon name="right" size={14} /></span><div><b>{INSTANCES[k].short}</b><small>{INSTANCES[k].label}</small></div></div></td>
+                      <td><div className="cell-name"><span className={`chev ${isOpen ? "on" : ""}`}><Icon name="right" size={14} /></span><div><b>{INSTANCES[k].short}</b><small>{INSTANCES[k].url.replace("https://", "")}</small></div></div></td>
                       {d?.error ? <td colSpan={HEAD.length} className="bad-t">{d.error}</td> : !q ? HEAD.map((h) => <td key={h} className="num"><Sk w="70%" h={12} /></td>) : cells(q).map((v, i) => <td key={i} className="num">{v}</td>)}
                       <td><button className="link" onClick={(e) => { e.stopPropagation(); onOpen(k); }}>Open</button></td>
                     </tr>

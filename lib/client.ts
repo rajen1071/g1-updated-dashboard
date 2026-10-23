@@ -14,8 +14,11 @@ export async function getJson(url: string, fresh = false) {
   return d;
 }
 export const cached = (url: string) => memo.get(url);
+// Refresh forgets every saved answer in this tab, so no page shows numbers from before the Refresh.
+export const clearMemo = () => memo.clear();
 export const overviewUrl = (k: string, r: Range, product = "") => `/api/overview?instance=${k}&from=${r.from}&to=${r.to}${product ? `&product=${encodeURIComponent(product)}` : ""}`;
 export const topUrl = (k: string) => `/api/top?instance=${k}`;
+export const newsletterUrl = (k: string) => `/api/newsletter?instance=${k}`;
 export const listUrl = (type: string, k: string, r: Range) => `/api/list?type=${type}&instance=${k}${type === "forms" ? `&from=${r.from}&to=${r.to}` : ""}`;
 
 const FIELDS = ["sent", "opened", "clicks", "lp", "forms", "bounced", "unsub"] as const;

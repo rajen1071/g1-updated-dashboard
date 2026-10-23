@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { INSTANCES } from "@/lib/instances";
-import { combine, getJson, listUrl, Range } from "@/lib/client";
+import { combine, getJson, listUrl, newsletterUrl, Range } from "@/lib/client";
 import { downloadCsv } from "@/lib/format";
 import Icon from "./Icon";
 import { LISTS } from "./ListView";
@@ -28,15 +28,25 @@ export default function ExportView({ ks, res, pending, range, product, scope, on
     const all = await Promise.all(ks.map((k) => getJson(listUrl(type, k, range)).then((d) => [k, d] as const)));
     setBusy("");
     setErrs(all.map(([, d]) => d.error).filter(Boolean));
-    const cols = LISTS[type].cols.filter((c) => c.k !== "rate");
+    const cols = LISTS[type].cols.filter((c) => c.k !== "rate" && c.k !== "change");
     const rows = all.flatMap(([k, d]) => (d.rows || []).filter((r: any) => !product || r.product === product).map((r: any) => [INSTANCES[k].short, r.id, ...cols.map((c) => r[c.k]), ...(type === "emails" ? [r.subject] : [])]));
     downloadCsv(`${type}_${type === "forms" ? tag : scope.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.csv`, [["Instance", "ID", ...cols.map((c) => c.label), ...(type === "emails" ? ["Subject"] : [])], ...rows]);
+  };
+
+  const newsletters = async () => {
+    setBusy("newsletter"); setErrs([]);
+    const all = await Promise.all(ks.map((k) => getJson(newsletterUrl(k)).then((d) => [k, d] as const)));
+    setBusy("");
+    setErrs(all.map(([, d]) => d.error).filter(Boolean));
+    downloadCsv("newsletters.csv", [["Instance", "ID", "Name", "Subject", "Sent On", "Sent", "Unique Opens", "Unique Clicks", "LP Visits", "Bounced", "Unsubscribes"],
+      ...all.flatMap(([k, d]) => (d.rows || []).map((r: any) => [INSTANCES[k].short, r.id, r.name, r.subject, r.date.slice(0, 10), r.sent, r.opened, r.clicks, r.lp, r.bounced, r.unsub]))]);
   };
 
   const items: [string, string, string, string, () => void, boolean][] = [
     ["summary", "Summary by instance", "Totals for each instance for the selected dates: sent, opens, clicks, visits, forms, bounces and unsubscribes.", "overview", summary, ready],
     ["trend", "Performance trend", "The same numbers split by day (or by week for long date ranges).", "export", trend, ready],
     ["emails", "Email list", "Every published email with product, category, and all-time sends, opens and unique clicks.", "emails", () => list("emails"), true],
+    ["newsletter", "Newsletter list", "Every newsletter with send date and all-time sends, opens, unique clicks, visits, bounces and unsubscribes.", "newsletter", newsletters, true],
     ["campaigns", "Campaign list", "Every published campaign with steps, segments and forms.", "campaigns", () => list("campaigns"), true],
     ["pages", "Landing page list", "Every published landing page with all-time visits.", "pages", () => list("pages"), true],
     ["forms", "Form list", "Every published form with the number of submissions in the selected dates.", "forms", () => list("forms"), true],

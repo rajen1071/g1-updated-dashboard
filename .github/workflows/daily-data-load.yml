@@ -1,13 +1,15 @@
-# Loads new data from Mautic into the dashboard every day at 3 AM Pacific time, so it is ready when people open it.
-# GitHub schedules use UTC, so the job is scheduled for 3 AM PDT (10:05 UTC) and 3 AM PST (11:05 UTC);
-# the script only runs when it is 3 AM in Los Angeles. "Run workflow" on the Actions tab runs it at any time.
+# Loads new data from Mautic into the dashboard once a day, after 3 AM Pacific time, so it is ready when people open it.
+# GitHub schedules use UTC and often start late, so there are several start times (3 AM PDT, 3 AM PST and a later backup).
+# The script only loads when it is after 3 AM in Los Angeles and the data was not refreshed since then; other runs stop at once.
+# "Run workflow" on the Actions tab loads the data at any time.
 # Needs the repository variable DASHBOARD_URL (Settings > Secrets and variables > Actions > Variables).
 name: Daily data load (3 AM Pacific)
 
 on:
   schedule:
-    - cron: "5 10 * * *"
-    - cron: "5 11 * * *"
+    - cron: "17 10 * * *"
+    - cron: "17 11 * * *"
+    - cron: "17 13 * * *"
   workflow_dispatch:
 
 jobs:
@@ -15,13 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npx tsx scripts/warm.ts
         env:
           DASHBOARD_URL: ${{ vars.DASHBOARD_URL }}
-          ONLY_AT_PACIFIC_HOUR: ${{ github.event_name == 'schedule' && '3' || '' }}
+          DAILY_AFTER_PACIFIC_HOUR: ${{ github.event_name == 'schedule' && '3' || '' }}

@@ -27,7 +27,7 @@ The slow building blocks (email list with A/B variants, campaign list, clicks) a
 If the server runs out of time, the browser tries the request again (up to 3 times); each try continues from the parts already saved.
 
 ## Daily data load (3 AM Pacific)
-The GitHub workflow `.github/workflows/daily-data-load.yml` runs `scripts/warm.ts` every day at 3 AM Pacific time (PST in winter, PDT in summer).
+The GitHub workflow `.github/workflows/daily-data-load.yml` runs `scripts/warm.ts` once a day after 3 AM Pacific time (PST in winter, PDT in summer). GitHub often starts scheduled jobs late, so the workflow has three start times; the first run after 3 AM loads the data, and later runs see (through `/api/status`) that the data was already refreshed today and stop at once. A Refresh click after 3 AM also counts as today's load.
 It does what the Refresh button does and then opens every page once for the default dates (the last 2 weeks), so the dashboard is ready when people open it. Clicking **Refresh** still gets the newest data at any time.
 - Setup: in GitHub, **Settings > Secrets and variables > Actions > Variables**, add `DASHBOARD_URL` with the dashboard address (for example `https://your-dashboard.vercel.app`). To test it, open the **Actions** tab, choose "Daily data load (3 AM Pacific)" and click **Run workflow**.
 - `MONGODB_URI` must be set on Vercel. Without it, the loaded data stays in the memory of the one server that loaded it, and other visitors may not get it.

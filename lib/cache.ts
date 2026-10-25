@@ -25,8 +25,8 @@ function collection() {
   return g._cacheCol;
 }
 
-// Time of the last Refresh click (ms), for the memory caches in lib/mautic.ts.
-export const refreshedAt = () => stamp.at;
+// Time of the last Refresh (ms; 0 when there was none yet), from a Refresh click or the daily data load.
+export async function refreshedAt() { await syncStamp(); return stamp.at; }
 
 // Reads the last Refresh time from MongoDB, at most every 10 seconds, so a Refresh on one server reaches the others.
 async function syncStamp() {

@@ -1,17 +1,25 @@
 // Daily data load: gets new data from Mautic for every page of the dashboard (default dates: the last 2 weeks), so people
 // who open the dashboard later find it ready. It does what the Refresh button does, then opens every page once.
 // Run: DASHBOARD_URL=https://your-dashboard.vercel.app npx tsx scripts/warm.ts
-// ONLY_AT_PACIFIC_HOUR=3 makes it stop unless it is 3 AM in Los Angeles (the schedule runs at 3 AM PST and 3 AM PDT).
+// DAILY_AFTER_PACIFIC_HOUR=3 makes it run once a day: only after 3 AM in Los Angeles, and only if the data was not refreshed
+// since then (by an earlier run or by someone clicking Refresh). GitHub often starts scheduled jobs late, so the schedule
+// has several start times and whichever run comes first after 3 AM does the work.
 import { KEYS, listUrl, newsletterUrl, overviewUrl, topUrl } from "../lib/client";
 import { lastWeeks } from "../lib/format";
 
 const base = (process.env.DASHBOARD_URL || "").replace(/\/+$/, "");
-if (!base) { console.error("Set DASHBOARD_URL to the dashboard address, for example https://your-dashboard.vercel.app"); process.exit(1); }
+if (!base) {
+  console.error("DASHBOARD_URL is not set. On GitHub add it under Settings > Secrets and variables > Actions > Variables,");
+  console.error("with the dashboard address, for example https://your-dashboard.vercel.app");
+  process.exit(1);
+}
 
-const hour = Number(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", hourCycle: "h23" }));
-if (process.env.ONLY_AT_PACIFIC_HOUR && hour !== Number(process.env.ONLY_AT_PACIFIC_HOUR)) {
-  console.log(`It is ${hour}:00 in Los Angeles, not ${process.env.ONLY_AT_PACIFIC_HOUR}:00. Nothing to do.`);
-  process.exit(0);
+// The time it is now in Los Angeles, and today's start hour there as a moment in time.
+function pacificStart(hour: number) {
+  const now = new Date(), p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", hourCycle: "h23" })
+    .formatToParts(now).map((x) => [x.type, Number(x.value)]));
+  const offset = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - Math.floor(+now / 60000) * 60000;
+  return { hour: p.hour, start: Date.UTC(p.year, p.month - 1, p.day, hour) - offset };
 }
 
 const range = lastWeeks(2);
@@ -31,6 +39,13 @@ async function get(path: string) {
 }
 
 (async () => {
+  if (process.env.DAILY_AFTER_PACIFIC_HOUR) {
+    const h = Number(process.env.DAILY_AFTER_PACIFIC_HOUR), { hour, start } = pacificStart(h);
+    if (hour < h) { console.log(`It is ${hour}:xx in Los Angeles, before ${h} AM. Nothing to do yet.`); return; }
+    const st = await fetch(`${base}/api/status`).then((r) => r.json()).catch((e) => ({ error: e.message }));
+    if (st.error) { console.error(`Could not read ${base}/api/status: ${st.error}`); process.exit(1); }
+    if (st.refreshedAt && Date.parse(st.refreshedAt) >= start) { console.log(`Already loaded today (last refresh ${st.refreshedAt}). Nothing to do.`); return; }
+  }
   console.log(`Loading ${base} for ${range.from} to ${range.to}`);
   const steps: [string, (k: string) => string][] = [
     // First step asks for new data from Mautic (like the Refresh button); every later answer is then built again too.

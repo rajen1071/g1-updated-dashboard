@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { INSTANCES } from "@/lib/instances";
 import { applyTheme, DEFAULT_THEME, THEMES } from "@/lib/themes";
 import { day, lastWeeks } from "@/lib/format";
-import { clearMemo, getJson, GROUP_NAMES, GROUPS, KEYS, listUrl, newsletterUrl, overviewUrl, topUrl } from "@/lib/client";
+import { clearMemo, getJson, GROUP_NAMES, GROUPS, idle, KEYS, listUrl, newsletterUrl, overviewUrl, topUrl } from "@/lib/client";
 import { useData } from "@/lib/useData";
 import Icon from "@/components/Icon";
 import Overview from "@/components/Overview";
@@ -76,7 +76,7 @@ export default function Page() {
   const { res, pending } = useData(OVERVIEW_VIEWS.includes(view) && validRange ? ks : [], (k) => overviewUrl(k, range, prod), nonce);
 
   // Every other page is loaded in the background for the same instances and dates, so opening it shows the data at once.
-  // It starts shortly after the visible page, so the visible page is asked for first (and gets the Refresh, when there is one).
+  // It waits until the visible page has its data, so the two do not slow each other down (and the visible page gets the Refresh).
   const preload = useRef(0);
   useEffect(() => {
     if (!validRange) return;
@@ -84,6 +84,7 @@ export default function Page() {
     const steps: ((k: string) => string)[] = [(k) => overviewUrl(k, range, prod), topUrl, newsletterUrl,
       ...["forms", "emails", "pages", "campaigns"].map((t) => (k: string) => listUrl(t, k, range))];
     const t = setTimeout(async () => {
+      while (!idle()) { if (id !== preload.current) return; await new Promise((r) => setTimeout(r, 500)); }
       for (const url of steps) {
         if (id !== preload.current) return;
         await Promise.all(ks.map((k) => getJson(url(k))));

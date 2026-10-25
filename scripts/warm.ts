@@ -1,4 +1,4 @@
-// Daily data load: gets new data from Mautic for every page of the dashboard (default dates: the last 2 weeks), so people
+// Daily data load: gets new data from Mautic for every page of the dashboard (for the 1, 2, 4 and 8 week buttons), so people
 // who open the dashboard later find it ready. It does what the Refresh button does, then opens every page once.
 // Run: DASHBOARD_URL=https://your-dashboard.vercel.app npx tsx scripts/warm.ts
 // DAILY_AFTER_PACIFIC_HOUR=3 makes it run once a day: only after 3 AM in Los Angeles, and only if the data was not refreshed
@@ -22,7 +22,9 @@ function pacificStart(hour: number) {
   return { hour: p.hour, start: Date.UTC(p.year, p.month - 1, p.day, hour) - offset };
 }
 
-const range = lastWeeks(2);
+// The default dates (2 weeks) are loaded first, then the other date buttons, so every button shows its data at once.
+const WEEKS = (process.env.WEEKS || "2,1,4,8").split(",").map(Number); // WEEKS=2 loads only the default dates
+
 // Each request is tried up to 4 times: a try that runs out of time still saves the parts it finished, so the next try is shorter.
 // Only the first try asks for a refresh; a second refresh would throw away what the first try saved.
 async function get(path: string) {
@@ -46,21 +48,24 @@ async function get(path: string) {
     if (st.error) { console.error(`Could not read ${base}/api/status: ${st.error}`); process.exit(1); }
     if (st.refreshedAt && Date.parse(st.refreshedAt) >= start) { console.log(`Already loaded today (last refresh ${st.refreshedAt}). Nothing to do.`); return; }
   }
-  console.log(`Loading ${base} for ${range.from} to ${range.to}`);
-  const steps: [string, (k: string) => string][] = [
-    // First step asks for new data from Mautic (like the Refresh button); every later answer is then built again too.
-    ["Overview (refresh)", (k) => overviewUrl(k, range) + "&refresh=1"],
-    ["Top tables", topUrl],
-    ["Newsletter", newsletterUrl],
-    ["Forms", (k) => listUrl("forms", k, range)],
-    ["Email Reports and Nurture Emails", (k) => listUrl("emails", k, range)],
-    ["Landing Pages", (k) => listUrl("pages", k, range)],
-    ["Campaigns", (k) => listUrl("campaigns", k, range)],
-  ];
   let failed = 0;
-  for (const [name, url] of steps) {
-    console.log(name);
-    failed += (await Promise.all(KEYS.map((k) => get(url(k))))).filter((ok) => !ok).length;
+  for (const weeks of WEEKS) {
+    const range = lastWeeks(weeks);
+    console.log(`
+== ${weeks} week(s): ${range.from} to ${range.to} (${base})`);
+    const steps: [string, (k: string) => string][] = [
+      // The very first step asks for new data from Mautic (like the Refresh button); every later answer is then built again too.
+      [weeks === WEEKS[0] ? "Overview (refresh)" : "Overview", (k) => overviewUrl(k, range) + (weeks === WEEKS[0] ? "&refresh=1" : "")],
+      ...(weeks === WEEKS[0] ? [["Top tables", topUrl], ["Newsletter", newsletterUrl]] as [string, (k: string) => string][] : []),
+      ["Forms", (k) => listUrl("forms", k, range)],
+      ["Email Reports and Nurture Emails", (k) => listUrl("emails", k, range)],
+      ["Landing Pages", (k) => listUrl("pages", k, range)],
+      ["Campaigns", (k) => listUrl("campaigns", k, range)],
+    ];
+    for (const [name, url] of steps) {
+      console.log(name);
+      failed += (await Promise.all(KEYS.map((k) => get(url(k))))).filter((ok) => !ok).length;
+    }
   }
   console.log(failed ? `Done, but ${failed} request(s) failed.` : "Done. All pages are loaded.");
   process.exit(failed ? 1 : 0);

@@ -31,6 +31,8 @@ async function load(url: string, fresh: boolean) {
   return d;
 }
 export const cached = (url: string) => memo.get(url);
+// True when no request is running (the visible page has its data).
+export const idle = () => running.size === 0;
 // Refresh forgets every saved answer in this tab, so no page shows numbers from before the Refresh.
 export const clearMemo = () => { memo.clear(); running.clear(); };
 export const overviewUrl = (k: string, r: Range, product = "") => `/api/overview?instance=${k}&from=${r.from}&to=${r.to}${product ? `&product=${encodeURIComponent(product)}` : ""}`;

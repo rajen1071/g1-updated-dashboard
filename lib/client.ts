@@ -35,9 +35,12 @@ export const cached = (url: string) => memo.get(url);
 export const idle = () => running.size === 0;
 // Refresh forgets every saved answer in this tab, so no page shows numbers from before the Refresh.
 export const clearMemo = () => { memo.clear(); running.clear(); };
+// Forgets one saved answer, so the next request for it asks the server again.
+export const forget = (url: string) => memo.delete(url);
 export const overviewUrl = (k: string, r: Range, product = "") => `/api/overview?instance=${k}&from=${r.from}&to=${r.to}${product ? `&product=${encodeURIComponent(product)}` : ""}`;
 export const topUrl = (k: string) => `/api/top?instance=${k}`;
 export const newsletterUrl = (k: string) => `/api/newsletter?instance=${k}`;
+export const sendsUrl = (k: string) => `/api/sends?instance=${k}`;
 export const listUrl = (type: string, k: string, r: Range) => `/api/list?type=${type}&instance=${k}&from=${r.from}&to=${r.to}`;
 
 const FIELDS = ["sent", "opened", "clicks", "lp", "forms", "bounced", "unsub"] as const;

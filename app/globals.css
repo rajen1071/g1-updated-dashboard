@@ -406,3 +406,78 @@ input[type=date]{height:38px;padding:0 10px;border:1px solid var(--border);borde
   .inst-h b{font-size:13.5px}
   .inst .mini.four{grid-template-columns:1fr 1fr}
 }
+
+/* Send Monitor: weekly JTBD send schedule. Status colors: green sent, amber dropped, red not sent, violet due today. */
+.nav-cnt{margin-left:auto;background:#dc2626;color:#fff;font-size:11px;font-weight:600;border-radius:10px;padding:1px 7px}
+.checked{font-size:12px;color:var(--muted)}
+.sm{--sm-green:var(--good);--sm-red:#dc2626;--sm-amber:#d97706;--sm-violet:#7c3aed;
+  --sm-green-soft:color-mix(in srgb,var(--sm-green) 10%,var(--surface));--sm-red-soft:color-mix(in srgb,var(--sm-red) 9%,var(--surface));
+  --sm-amber-soft:color-mix(in srgb,#f59e0b 13%,var(--surface));--sm-violet-soft:color-mix(in srgb,var(--sm-violet) 10%,var(--surface))}
+.sm-tabs{display:flex;gap:10px;margin:4px 0 16px;flex-wrap:wrap}
+.sm-tab{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 16px;min-width:150px;text-align:left}
+.sm-tab b{display:block;font-weight:600}
+.sm-tab span{font-size:12px;color:var(--muted)}
+.sm-tab.on{border:2px solid var(--primary);background:var(--primarySoft);padding:8px 15px}
+.sm-tab.on b{color:var(--primary)}
+.sm-tab .cnt{background:var(--sm-red);color:#fff;border-radius:9px;font-size:11px;padding:0 6px;margin-left:8px}
+
+.sm-alert{display:flex;gap:14px;align-items:flex-start;background:var(--sm-red-soft);border:1px solid color-mix(in srgb,var(--sm-red) 28%,transparent);border-left:5px solid var(--sm-red);border-radius:10px;padding:14px 18px;margin-bottom:18px}
+.sm-alert.ok{background:var(--sm-green-soft);border-color:color-mix(in srgb,var(--sm-green) 28%,transparent);border-left-color:var(--sm-green)}
+.sm-alert.warn{background:var(--sm-amber-soft);border-color:color-mix(in srgb,var(--sm-amber) 30%,transparent);border-left-color:var(--sm-amber)}
+.sm-alert .ic{font-size:20px;line-height:1}
+.sm-alert h3{margin:0 0 6px;font-size:15px}
+.sm-alert ul{margin:0;padding-left:18px;font-size:13px}
+.sm-alert li{margin:2px 0}
+
+.sm-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:18px}
+.sm-card h2{margin:0;font-size:16px;font-weight:600}
+.sm-card .cs{color:var(--muted);font-size:13px;margin:2px 0 14px}
+.sm-card.compact{padding:12px 18px}
+.sm .strip{display:flex;flex-wrap:wrap;gap:6px 28px;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.sm .st{display:flex;align-items:baseline;gap:6px;font-size:12px;color:var(--muted)}
+.sm .st b{color:var(--text);font-size:14px;font-weight:600}
+.sm .st b.red{color:var(--sm-red)}
+.sm .wk-h{font-size:12px;font-weight:600;margin-bottom:2px}
+.sm .wk-h span{color:var(--muted);font-weight:400;margin-left:4px}
+.sm .wrow{display:flex;align-items:center;gap:10px;padding:4px 0;flex-wrap:wrap}
+.sm .wlab{width:112px;font-size:12px;color:var(--muted);flex-shrink:0;white-space:nowrap}
+.sm .wlab.today{color:var(--primary);font-weight:600}
+.sm .ch{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:14px;padding:2px 10px;font-size:12px;background:var(--surface);white-space:nowrap}
+.sm .ch i{width:7px;height:7px;border-radius:50%;background:color-mix(in srgb,var(--muted) 45%,transparent)}
+.sm .ch em{font-style:normal;color:var(--muted);font-size:11px}
+.sm .ch.sent i{background:var(--sm-green)}.sm .ch.low i{background:var(--sm-amber)}.sm .ch.due i{background:var(--sm-violet)}
+.sm .ch.low{border-color:color-mix(in srgb,var(--sm-amber) 35%,transparent);background:var(--sm-amber-soft)}
+.sm .ch.missing{background:var(--sm-red);border-color:var(--sm-red);color:#fff;font-weight:600}
+.sm .ch.missing i{background:#fff}.sm .ch.missing em{color:#fff}
+.sm .wnone{font-size:12px;color:color-mix(in srgb,var(--muted) 60%,transparent);padding:4px 0}
+
+.sm table{width:100%;border-collapse:collapse}
+.sm th{text-align:left;font-size:12px;color:var(--muted);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.sm td{padding:11px 10px;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:13px;vertical-align:middle}
+.sm tr.bad td{background:color-mix(in srgb,var(--sm-red) 4%,var(--surface))}
+.sm .num{text-align:right;font-variant-numeric:tabular-nums}
+.sm .daytag{display:inline-block;background:var(--primarySoft);color:var(--primary);font-weight:600;font-size:12px;border-radius:6px;padding:2px 8px}
+.sm .pill{display:inline-flex;align-items:center;gap:6px;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+.sm .p-sent{background:var(--sm-green-soft);color:var(--sm-green)}
+.sm .p-missing{background:var(--sm-red-soft);color:var(--sm-red)}
+.sm .p-low{background:var(--sm-amber-soft);color:var(--sm-amber)}
+.sm .p-due{background:var(--sm-violet-soft);color:var(--sm-violet)}
+.sm .p-upcoming{background:var(--surface2);color:var(--muted)}
+.sm .why{font-size:11px;color:var(--muted);margin-top:3px;max-width:260px}
+.sm-chg{font-weight:600;font-size:12px;white-space:nowrap;color:var(--muted)}
+.sm-chg.down{color:var(--sm-red)}
+.sm .hist td,.sm .hist th{text-align:center;padding:8px 6px}
+.sm .hist td:first-child,.sm .hist th:first-child{text-align:left}
+.sm .hist td:first-child b{display:block;font-weight:500}
+.sm .hist td:first-child span{font-size:11px;color:var(--muted)}
+.sm .cell{display:inline-grid;place-items:center;min-width:42px;height:28px;padding:0 4px;border-radius:6px;font-size:12px;font-weight:600}
+.sm .c-sent{background:var(--sm-green-soft);color:var(--sm-green)}
+.sm .c-missing{background:var(--sm-red);color:#fff}
+.sm .c-low{background:var(--sm-amber-soft);color:var(--sm-amber)}
+.sm .c-due{background:var(--sm-violet-soft);color:var(--sm-violet)}
+.sm .c-upcoming{background:var(--surface2);color:color-mix(in srgb,var(--muted) 60%,transparent)}
+.sm-legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:12px;flex-wrap:wrap}
+.sm-legend span{display:flex;gap:6px;align-items:center}
+.sm-legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.sm .tbl-wrap{overflow-x:auto}
+@media(max-width:600px){.sm-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.sm-tab{flex:0 0 auto}.sm-card{padding:14px}}

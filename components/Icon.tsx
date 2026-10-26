@@ -1,5 +1,6 @@
 // Small stroke icons (24x24 grid), so the app needs no icon library.
 const P: Record<string, string> = {
+  sendmonitor: "M12 4a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 9v4l2.5 2M10 2h4",
   overview: "M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z",
   instances: "M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01",
   emails: "M3 5h18v14H3zM3 6l9 7 9-7",

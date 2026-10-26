@@ -12,9 +12,11 @@ import ListView from "@/components/ListView";
 import ExportView from "@/components/ExportView";
 import NurtureView from "@/components/NurtureView";
 import NewsletterView from "@/components/NewsletterView";
+import SendMonitor, { checkedText, useSends } from "@/components/SendMonitor";
 import { FormsTrend } from "@/components/OverviewSections";
 
 const NAV: [string, string, string][] = [
+  ["sendmonitor", "Send Monitor", "Weekly JTBD email schedule: what's expected and what was sent"],
   ["overview", "Email Marketing Overview", "Overall email, newsletter, landing page and form performance across all Mautic instances"],
   ["instances", "All Instances", "Compare every Mautic instance side by side"],
   ["newsletter", "Newsletter", "Every newsletter sent in the selected dates, with its sends, opens, clicks, bounces and unsubscribes"],
@@ -73,6 +75,7 @@ export default function Page() {
   const ks = view === "instances" || inst === "all" ? KEYS : group ? GROUPS[group] : [inst];
   const prod = single ? product : "";
 
+  const sm = useSends(nonce);
   const { res, pending } = useData(OVERVIEW_VIEWS.includes(view) && validRange ? ks : [], (k) => overviewUrl(k, range, prod), nonce);
 
   // Every other page is loaded in the background for the same instances and dates, so opening it shows the data at once.
@@ -115,7 +118,7 @@ export default function Page() {
         </div>
         <nav>
           <span className="nav-h">Menu</span>
-          {NAV.map(([k, l]) => <button key={k} className={`nav ${view === k ? "on" : ""}`} onClick={() => go(k)} aria-current={view === k ? "page" : undefined}><Icon name={k} /><span>{k === "overview" ? "Overview" : l}</span></button>)}
+          {NAV.map(([k, l]) => <button key={k} className={`nav ${view === k ? "on" : ""}`} onClick={() => go(k)} aria-current={view === k ? "page" : undefined}><Icon name={k} /><span>{k === "overview" ? "Overview" : l}</span>{k === "sendmonitor" && sm.missed > 0 && <span className="nav-cnt">{sm.missed}</span>}</button>)}
         </nav>
         <div className="side-foot"><span className="live" /> Live data from {KEYS.length} Mautic instances</div>
       </aside>
@@ -124,10 +127,11 @@ export default function Page() {
       <main className="main">
         <header className="top">
           <button className="ib" onClick={toggleSide} aria-label="Show or hide the menu" title="Show or hide the menu"><Icon name="menu" /></button>
-          <div className="ttl"><h1>{title}</h1><p>{scope}{validRange && <> · {day(range.from, true)} – {day(range.to, true)}</>}</p></div>
+          <div className="ttl"><h1>{title}</h1><p>{view === "sendmonitor" ? hint : <>{scope}{validRange && <> · {day(range.from, true)} – {day(range.to, true)}</>}</>}</p></div>
           <div className="tools">
+            {view === "sendmonitor" && <span className="checked">{checkedText(sm.checked)}</span>}
             {/* Custom dates open in a small menu, so the header keeps the same width. */}
-            <div className="date-box" ref={dateBox}>
+            {view !== "sendmonitor" && <div className="date-box" ref={dateBox}>
               <div className="seg">
                 {RANGES.map(([w, l]) => <button key={w} className={weeks === w ? "on" : ""} onClick={() => { setWeeks(w); setDateMenu(false); }}>{l}</button>)}
                 <button className={weeks === "custom" ? "on" : ""} aria-expanded={dateMenu} onClick={() => { if (weeks !== "custom") { setCustom(range); setWeeks("custom"); } setDateMenu(!dateMenu); }}>
@@ -140,7 +144,7 @@ export default function Page() {
                 <label>To<input type="date" value={custom.to} min={custom.from || undefined} onChange={(e) => setCustom({ ...custom, to: e.target.value })} /></label>
                 <button className="btn primary" onClick={() => setDateMenu(false)}>Done</button>
               </div>}
-            </div>
+            </div>}
             <button className="btn" onClick={() => { clearMemo(); setNonce(nonce + 1); }} title="Get new data from Mautic for every page"><Icon name="refresh" size={16} /> Refresh</button>
             <div className="theme-box" ref={themeBox}>
               <button className="btn" onClick={() => setThemeMenu(!themeMenu)} aria-expanded={themeMenu}><Icon name="palette" size={16} /> Theme</button>
@@ -156,9 +160,9 @@ export default function Page() {
           </div>
         </header>
 
-        {!validRange && <div className="err">Please choose a start date and an end date. The start date must be before the end date.</div>}
+        {!validRange && view !== "sendmonitor" && <div className="err">Please choose a start date and an end date. The start date must be before the end date.</div>}
 
-        {view !== "instances" && <div className="tabs" role="tablist">
+        {!["instances", "sendmonitor"].includes(view) && <div className="tabs" role="tablist">
           <div className="tg"><span className="tg-h">Combined</span>
             <button className={`tab ${inst === "all" ? "on" : ""}`} onClick={() => pick("all")}><b>All Instances ({KEYS.length})</b><small>Altametrics and Plum</small></button></div>
           {GROUP_NAMES.map((g) => (
@@ -175,7 +179,8 @@ export default function Page() {
           {products.map((p) => <button key={p} className={product === p ? "on" : ""} onClick={() => setProduct(p)}>{p}</button>)}
         </div>}
 
-        <p className="hint">{hint}</p>
+        {view !== "sendmonitor" && <p className="hint">{hint}</p>}
+        {view === "sendmonitor" && <SendMonitor data={sm} />}
         {view === "overview" && <Overview ks={ks} res={res} pending={pending} product={prod} range={range} theme={theme} nonce={nonce} onOpen={details} onGo={go} />}
         {view === "instances" && <AllInstances res={res} pending={pending} theme={theme} onOpen={(k) => { setInst(k); setProduct(""); go("overview"); }} onBack={() => go("overview")} />}
         {view === "forms" && validRange && <FormsTrend ks={ks} res={res} pending={pending} theme={theme} />}

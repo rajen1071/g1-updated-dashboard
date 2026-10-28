@@ -4,7 +4,7 @@
 // DAILY_AFTER_PACIFIC_HOUR=3 makes it run once a day: only after 3 AM in Los Angeles, and only if the data was not refreshed
 // since then (by an earlier run or by someone clicking Refresh). GitHub often starts scheduled jobs late, so the schedule
 // has several start times and whichever run comes first after 3 AM does the work.
-import { KEYS, listUrl, newsletterUrl, overviewUrl, topUrl } from "../lib/client";
+import { KEYS, listUrl, newsletterUrl, overviewUrl, sendsUrl, topUrl } from "../lib/client";
 import { lastWeeks } from "../lib/format";
 
 const base = (process.env.DASHBOARD_URL || "").replace(/\/+$/, "");
@@ -44,7 +44,13 @@ async function get(path: string) {
   if (process.env.DAILY_AFTER_PACIFIC_HOUR) {
     const h = Number(process.env.DAILY_AFTER_PACIFIC_HOUR), { hour, start } = pacificStart(h);
     if (hour < h) { console.log(`It is ${hour}:xx in Los Angeles, before ${h} AM. Nothing to do yet.`); return; }
-    const st = await fetch(`${base}/api/status`).then((r) => r.json()).catch((e) => ({ error: e.message }));
+    // A wrong address, a stopped site or Vercel's login page (Deployment Protection) answer with HTML, not JSON: say which.
+    const st = await fetch(`${base}/api/status`).then(async (r) => {
+      const t = await r.text();
+      try { return JSON.parse(t); } catch {
+        return { error: `HTTP ${r.status}, not a JSON answer${r.status === 401 || /vercel|login|sso/i.test(t.slice(0, 2000)) ? " (Vercel Deployment Protection is probably asking for a login: turn it off for this project or add a bypass)" : r.status === 404 ? " (check that DASHBOARD_URL is the dashboard address)" : ""}` };
+      }
+    }).catch((e) => ({ error: `${e.message} (check that DASHBOARD_URL is right and the site is up)` }));
     if (st.error) { console.error(`Could not read ${base}/api/status: ${st.error}`); process.exit(1); }
     if (st.refreshedAt && Date.parse(st.refreshedAt) >= start) { console.log(`Already loaded today (last refresh ${st.refreshedAt}). Nothing to do.`); return; }
   }
@@ -56,7 +62,7 @@ async function get(path: string) {
     const steps: [string, (k: string) => string][] = [
       // The very first step asks for new data from Mautic (like the Refresh button); every later answer is then built again too.
       [weeks === WEEKS[0] ? "Overview (refresh)" : "Overview", (k) => overviewUrl(k, range) + (weeks === WEEKS[0] ? "&refresh=1" : "")],
-      ...(weeks === WEEKS[0] ? [["Top tables", topUrl], ["Newsletter", newsletterUrl]] as [string, (k: string) => string][] : []),
+      ...(weeks === WEEKS[0] ? [["Top tables", topUrl], ["Newsletter", newsletterUrl], ["Send Monitor", sendsUrl]] as [string, (k: string) => string][] : []),
       ["Forms", (k) => listUrl("forms", k, range)],
       ["Email Reports and Nurture Emails", (k) => listUrl("emails", k, range)],
       ["Landing Pages", (k) => listUrl("pages", k, range)],

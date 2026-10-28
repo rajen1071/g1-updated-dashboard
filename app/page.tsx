@@ -34,7 +34,7 @@ function load(k: string, d: string) { try { return localStorage.getItem(k) ?? d;
 function save(k: string, v: string) { try { localStorage.setItem(k, v); } catch {} }
 
 export default function Page() {
-  const [view, setView] = useState("overview");
+  const [view, setView] = useState("sendmonitor");
   const [inst, setInst] = useState("all");
   const [product, setProduct] = useState("");
   const [weeks, setWeeks] = useState<number | "custom">(2);
@@ -50,8 +50,10 @@ export default function Page() {
   useEffect(() => {
     setTheme(load("theme", DEFAULT_THEME)); setSideOpen(load("sidebar", "open") === "open");
     // Each page has its own link (for example #emails), so it can be bookmarked and survives a reload.
+    // Opening the dashboard always starts on the Send Monitor; the page links work while it is open (back/forward).
     const fromHash = () => { const h = location.hash.slice(1); if (NAV.some((x) => x[0] === h)) setView(h); };
-    fromHash(); window.addEventListener("hashchange", fromHash); return () => window.removeEventListener("hashchange", fromHash);
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+    window.addEventListener("hashchange", fromHash); return () => window.removeEventListener("hashchange", fromHash);
   }, []);
   useEffect(() => { applyTheme(theme); }, [theme]);
   useEffect(() => {
@@ -75,8 +77,9 @@ export default function Page() {
   const ks = view === "instances" || inst === "all" ? KEYS : group ? GROUPS[group] : [inst];
   const prod = single ? product : "";
 
-  const sm = useSends(nonce);
   const { res, pending } = useData(OVERVIEW_VIEWS.includes(view) && validRange ? ks : [], (k) => overviewUrl(k, range, prod), nonce);
+  // Send Monitor data (also used for the sidebar badge) waits until the visible page has its data, so it does not slow it down.
+  const sm = useSends(nonce, view === "sendmonitor" || !pending.length);
 
   // Every other page is loaded in the background for the same instances and dates, so opening it shows the data at once.
   // It waits until the visible page has its data, so the two do not slow each other down (and the visible page gets the Refresh).

@@ -124,10 +124,41 @@ export function uniqueClicks(key: string): Promise<Record<string, number>> {
 const fmt = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
 export const span = (from: string, to: string) => [fmt(new Date(from + "T00:00:00Z")), fmt(new Date(new Date(to + "T00:00:00Z").getTime() + 864e5))];
 
-// Sends, opens and email clicks of each live email in the selected dates (opens and clicks of the emails sent in those dates).
+// Email clicks as [email id, contact, click time]. Mautic only gives totals, so the click rows are downloaded to count
+// each contact once per email (unique clicks). Rows are fetched in fixed 7-day blocks, so every date range reuses them.
+export type Click = [number, string, string];
+const WEEK = 7 * 864e5;
+function clickBlock(key: string, n: number): Promise<Click[]> {
+  return shared(`raw|${key}|clicks-wk|${n}`, async () => {
+    const where = { "where[0][col]": "source", "where[0][expr]": "eq", "where[0][val]": "email",
+      "where[1][col]": "date_hit", "where[1][expr]": "gte", "where[1][val]": fmt(new Date(n * WEEK)),
+      "where[2][col]": "date_hit", "where[2][expr]": "lt", "where[2][val]": fmt(new Date((n + 1) * WEEK)) };
+    const total = Number((await mget(key, "stats/page_hits", { limit: 1, ...where })).total) || 0;
+    const pages = await runPool(Array.from({ length: Math.ceil(total / 1000) }, (_, i) => () =>
+      mget(key, "stats/page_hits", { limit: 1000, start: i * 1000, "order[0][col]": "id", "order[0][dir]": "ASC", ...where }).then((d) => d.stats || [])), 6);
+    // A click without a known contact counts on its own.
+    return pages.flat().map((r: any): Click => [Number(r.source_id), r.lead_id ? String(r.lead_id) : `hit${r.id}`, String(r.date_hit)]);
+  });
+}
+// Email clicks between two Mautic date-times (the end is not included).
+export async function clicksBetween(key: string, s: string, e: string): Promise<Click[]> {
+  const ms = (t: string) => Date.parse(t.replace(" ", "T") + "Z");
+  const a = Math.floor(ms(s) / WEEK), b = Math.floor((ms(e) - 1) / WEEK);
+  const blocks = await runPool(Array.from({ length: b - a + 1 }, (_, i) => () => clickBlock(key, a + i)), 3);
+  return blocks.flat().filter((c) => c[2] >= s && c[2] < e);
+}
+// Unique clicks: each contact is counted once per email.
+export const uniqueClickCount = (clicks: Click[]) => new Set(clicks.map((c) => `${c[0]}|${c[1]}`)).size;
+export function uniqueClicksByEmail(clicks: Click[]) {
+  const seen = new Set<string>(), m: Record<number, number> = {};
+  clicks.forEach((c) => { const k = `${c[0]}|${c[1]}`; if (!seen.has(k)) { seen.add(k); m[c[0]] = (m[c[0]] || 0) + 1; } });
+  return m;
+}
+
+// Sends, opens and unique email clicks of each live email in the selected dates (opens of the emails sent in those dates, clicks made in them).
 // Sends are counted for every email first; opens and clicks only for the emails that sent something, which saves many Mautic calls.
 export function emailsInRange(key: string, from: string, to: string): Promise<Record<string, { sent: number; opened: number; clicks: number }>> {
-  return shared(`raw|${key}|emails-range|${from}|${to}`, async () => {
+  return shared(`raw|${key}|emails-range2|${from}|${to}`, async () => {
     const [F, T] = span(from, to);
     const rng = (col: string): W[] => [{ col, expr: "gte", val: F }, { col, expr: "lt", val: T }];
     const list = (await listAll(key, "emails", false)).filter((e) => isLive(e) && Number(e.sentCount) > 0);
@@ -140,13 +171,13 @@ export function emailsInRange(key: string, from: string, to: string): Promise<Re
     const sentById = new Map(maybe.map((id, i) => [id, each[i]]));
     const sent = list.map((e) => sentById.get(Number(e.id)) || 0);
     const active = list.filter((_, i) => sent[i] > 0);
-    const oc = await runPool(active.flatMap((e) => [
-      () => count(key, "email_stats", [{ col: "email_id", expr: "eq", val: e.id }, { col: "is_read", expr: "eq", val: 1 }, ...rng("date_sent")]),
-      () => count(key, "page_hits", [{ col: "source", expr: "eq", val: "email" }, { col: "source_id", expr: "eq", val: e.id }, ...rng("date_hit")]),
-    ]), 24);
+    const [opened, clicks] = await Promise.all([
+      runPool(active.map((e) => () => count(key, "email_stats", [{ col: "email_id", expr: "eq", val: e.id }, { col: "is_read", expr: "eq", val: 1 }, ...rng("date_sent")])), 24),
+      clicksBetween(key, F, T).then(uniqueClicksByEmail),
+    ]);
     const out: Record<string, { sent: number; opened: number; clicks: number }> = {};
     list.forEach((e, i) => (out[e.id] = { sent: sent[i], opened: 0, clicks: 0 }));
-    active.forEach((e, i) => Object.assign(out[e.id], { opened: oc[i * 2], clicks: oc[i * 2 + 1] }));
+    active.forEach((e, i) => Object.assign(out[e.id], { opened: opened[i], clicks: clicks[e.id] || 0 }));
     return out;
   });
 }

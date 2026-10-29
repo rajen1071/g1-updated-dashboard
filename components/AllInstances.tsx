@@ -16,14 +16,14 @@ function cells(q: any) {
   const del = q.sent == null || q.bounced == null ? null : Math.max(0, q.sent - q.bounced);
   return [n(q.sent), n(del), n(q.opened), pct(q.opened, q.sent), n(q.clicks), pct(q.clicks, q.sent), n(q.lp), n(q.forms), n(q.bounced), pct(q.bounced, q.sent), n(q.unsub)];
 }
-const HEAD = ["Sent", "Delivered", "Opens", "Open Rate", "Email Clicks", "Click Rate", "LP Visits", "Forms", "Bounced", "Bounce Rate", "Unsubs"];
+const HEAD = ["Sent", "Delivered", "Opens", "Open Rate", "Unique Clicks", "Click Rate", "LP Visits", "Forms", "Bounced", "Bounce Rate", "Unsubs"];
 
 export default function AllInstances({ res, pending, theme, onOpen, onBack }: Props) {
   const c = THEMES[theme].v;
   const [open, setOpen] = useState<string[]>([]);
   const { kpi } = combine(KEYS.map((k) => res[k]));
   const errs = KEYS.map((k) => res[k]?.error).filter(Boolean);
-  const chart = KEYS.filter((k) => res[k]?.kpi).map((k) => ({ name: INSTANCES[k].short, Sent: res[k].kpi.sent, Opened: res[k].kpi.opened, "Email Clicks": res[k].kpi.clicks }));
+  const chart = KEYS.filter((k) => res[k]?.kpi).map((k) => ({ name: INSTANCES[k].short, Sent: res[k].kpi.sent, Opened: res[k].kpi.opened, "Unique Clicks": res[k].kpi.clicks }));
   const best = (f: (q: any) => number) => KEYS.filter((k) => res[k]?.kpi?.sent).sort((a, b) => f(res[b].kpi) - f(res[a].kpi))[0];
   const topOpen = best((q) => q.opened / q.sent), topClick = best((q) => q.clicks / q.sent), topSent = best((q) => q.sent);
   const toggle = (k: string) => setOpen(open.includes(k) ? open.filter((x) => x !== k) : [...open, k]);
@@ -52,7 +52,7 @@ export default function AllInstances({ res, pending, theme, onOpen, onBack }: Pr
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: c.muted }} />
               <Bar isAnimationActive={false} dataKey="Sent" fill={c.c1} radius={[4, 4, 0, 0]} maxBarSize={36} />
               <Bar isAnimationActive={false} dataKey="Opened" fill={c.c2} radius={[4, 4, 0, 0]} maxBarSize={36} />
-              <Bar isAnimationActive={false} dataKey="Email Clicks" fill={c.c3} radius={[4, 4, 0, 0]} maxBarSize={36} />
+              <Bar isAnimationActive={false} dataKey="Unique Clicks" fill={c.c3} radius={[4, 4, 0, 0]} maxBarSize={36} />
             </BarChart>
           </ResponsiveContainer>}
       </Card>

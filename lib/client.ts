@@ -1,6 +1,6 @@
 import { INSTANCES } from "./instances";
 export const KEYS = Object.keys(INSTANCES);
-// Brand sections: Altametrics (Inventory, Timeclock, Scheduling) and Plum (Plum POS, Music, Accounting, Payroll).
+// Brand sections: Altametrics (Operations, Timeclock, Scheduling) and Plum (Plum POS, Music, Accounting, Payroll).
 export const GROUPS = KEYS.reduce((m, k) => ({ ...m, [INSTANCES[k].group]: [...(m[INSTANCES[k].group] || []), k] }), {} as Record<string, string[]>);
 export const GROUP_NAMES = Object.keys(GROUPS);
 export type Range = { from: string; to: string };

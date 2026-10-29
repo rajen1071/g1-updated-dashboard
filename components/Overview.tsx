@@ -34,19 +34,19 @@ export default function Overview({ ks, res, pending, product, range, theme, nonc
     ["Total Sent", k.sent, prev.sent, "Emails sent in this period", "emails", c.c1, true],
     ["Delivered", delivered, prevDelivered, `${pct(delivered, k.sent)} of sent`, "send", c.good, true],
     ["Unique Opens", k.opened, prev.opened, `${pct(k.opened, k.sent)} open rate`, "eye", c.c2, true],
-    ["Email Clicks", k.clicks, prev.clicks, `${pct(k.clicks, k.sent)} click rate`, "click", c.c3, true],
+    ["Unique Clicks", k.clicks, prev.clicks, `${pct(k.clicks, k.sent)} click rate`, "click", c.c3, true],
     ["Landing Page Visits", k.lp, prev.lp, k.lp == null ? "Not available for one product" : `${pct(k.lp, k.sent)} of sent`, "pages", c.c4, true],
     ["Form Submissions", k.forms, prev.forms, k.forms == null ? "Not available for one product" : `${pct(k.forms, k.sent)} of sent`, "forms", c.c5, true],
     ["Bounced", k.bounced, prev.bounced, `${pct(k.bounced, k.sent)} bounce rate`, "bounce", c.bad, false],
     ["Unsubscribes", k.unsub, prev.unsub, `${pct(k.unsub, k.sent)} unsubscribe rate`, "unsub", c.c5, false],
   ];
-  const lines: [string, string, string][] = [["sent", "Sent", c.c1], ["opened", "Opened", c.c2], ["clicks", "Email Clicks", c.c3], ...(k.lp == null ? [] : [["lp", "Landing Page Visits", c.c4] as [string, string, string]]), ...(k.forms == null ? [] : [["forms", "Form Submissions", c.c5] as [string, string, string]])];
+  const lines: [string, string, string][] = [["sent", "Sent", c.c1], ["opened", "Opened", c.c2], ["clicks", "Unique Clicks", c.c3], ...(k.lp == null ? [] : [["lp", "Landing Page Visits", c.c4] as [string, string, string]]), ...(k.forms == null ? [] : [["forms", "Form Submissions", c.c5] as [string, string, string]])];
   const notOpen = k.sent == null || k.opened == null || k.bounced == null ? 0 : Math.max(0, k.sent - k.bounced - k.opened);
   const donut = [{ name: "Opened", v: k.opened || 0, c: c.c2 }, { name: "Not opened", v: notOpen, c: c.border }, { name: "Bounced", v: k.bounced || 0, c: c.bad }];
   const extra: [string, number | null][] = [["Delivered", delivered], ["Clicked", k.clicks], ["Unsubscribes", k.unsub]];
   const funnel: [string, number | null, string, string][] = [
-    ["Email Clicks", k.clicks, `${pct(k.clicks, k.sent)} (of sent)`, c.c3],
-    ["Landing Page Visits", k.lp, `${pct(k.lp, k.clicks)} (of email clicks)`, c.c4],
+    ["Unique Clicks", k.clicks, `${pct(k.clicks, k.sent)} (of sent)`, c.c3],
+    ["Landing Page Visits", k.lp, `${pct(k.lp, k.clicks)} (of unique clicks)`, c.c4],
     ["Form Submissions", k.forms, `${pct(k.forms, k.lp)} (of page visits)`, c.good],
   ];
   // Instance cards are shown in two brand sections: Altametrics and Plum.
@@ -122,7 +122,7 @@ export default function Overview({ ks, res, pending, product, range, theme, nonc
         const top: [string, number | null, string][] = q ? [["Sent", q.sent, ""], ["Opens", q.opened, pct(q.opened, q.sent)], ["Clicks", q.clicks, pct(q.clicks, q.sent)]] : [];
         const bottom: [string, number | null, string][] = q ? [["LP Visits", q.lp, pct(q.lp, q.sent)], ["Forms", q.forms, pct(q.forms, q.sent)], ["Bounces", q.bounced, pct(q.bounced, q.sent)], ["Unsubs", q.unsub, pct(q.unsub, q.sent)]] : [];
         // Short labels keep four cards in one row; the full name shows on hover.
-        const full: Record<string, string> = { Clicks: "Email Clicks", "LP Visits": "Landing Page Visits", Forms: "Form Submissions", Bounces: "Bounced", Unsubs: "Unsubscribes" };
+        const full: Record<string, string> = { Clicks: "Unique Clicks", "LP Visits": "Landing Page Visits", Forms: "Form Submissions", Bounces: "Bounced", Unsubs: "Unsubscribes" };
         const cell = ([l, v, r]: [string, number | null, string]) => <div key={l} title={full[l]}><small>{l}</small><b>{n(v)}</b>{r && <span>{r}</span>}</div>;
         return (
           <div className="inst" key={x}>

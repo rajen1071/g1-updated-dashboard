@@ -17,7 +17,7 @@ const letterOf = (name: string) => name.match(/^\s*\d+-\d+\s+([A-Z])\b/)?.[1] ||
 const seqOf = (name: string) => Number(name.match(/^\s*\d+-(\d+)/)?.[1] || 0);
 const describe = (name: string) => name.split("|").slice(1).map((s) => s.trim()).filter((s) => !/^variant [a-z]$/i.test(s)).join(" · ");
 
-function groups(k: string, list: any[]): Group[] {
+export function groups(k: string, list: any[]): Group[] {
   const byId = new Map(list.map((r) => [r.id, r]));
   const out = new Map<number, any[]>();
   list.forEach((r) => { const root = r.parent && byId.has(r.parent) ? r.parent : r.id; out.set(root, [...(out.get(root) || []), r]); });
@@ -61,7 +61,7 @@ export default function NurtureView({ ks, range, product, nonce, onBack }: Props
         <label className="search"><Icon name="search" size={16} /><input placeholder="Search by email name" value={q} onChange={(e) => setQ(e.target.value)} /></label>
         <div className="seg">{MODES.map(([k, l]) => <button key={k} className={mode === k ? "on" : ""} onClick={() => setMode(k)}>{l}</button>)}</div>
       </div>
-      <p className="note top">Sends in the selected dates, with the opens and email clicks of those sends. Emails that sent nothing in these dates are not shown.</p>
+      <p className="note top">Sends in the selected dates, with the opens and unique email clicks of those sends. Emails that sent nothing in these dates are not shown.</p>
 
       {first && Array.from({ length: 3 }, (_, i) => <div className="card" key={i}><Sk w="30%" h={18} /><Sk w="100%" h={120} /></div>)}
       {!first && all.length === 0 && <div className="card empty">No {label} were sent in these dates{product ? ` for ${product}` : ""}.</div>}
@@ -70,13 +70,13 @@ export default function NurtureView({ ks, range, product, nonce, onBack }: Props
           <div className="vg-h">
             <div><b>{g.title}</b><small>{ks.length > 1 ? `${INSTANCES[g.inst].short} · ` : ""}{g.sub || g.product}</small></div>
             <div className="vg-stats">
-              <span>Sent <b>{n(g.sent)}</b></span><span>Opens <b>{n(g.opened)}</b></span><span>Clicks <b>{n(g.clicks)}</b></span>
+              <span>Sent <b>{n(g.sent)}</b></span><span>Opens <b>{n(g.opened)}</b></span><span>Unique Clicks <b>{n(g.clicks)}</b></span>
               <span>Open Rate <b>{pct(g.opened, g.sent)}</b></span><span>Click Rate <b>{pct(g.clicks, g.sent)}</b></span>
             </div>
           </div>
           <div className="table-wrap">
             <table className="tbl vtbl">
-              <thead><tr><th>Variant</th><th>Name</th><th className="num">Sent</th><th className="num">Read Count</th><th>Read Ratio</th><th className="num">Email Clicks</th><th>Click Ratio</th><th className="num">Not Open</th><th className="num">Not Open %</th></tr></thead>
+              <thead><tr><th>Variant</th><th>Name</th><th className="num">Sent</th><th className="num">Read Count</th><th>Read Ratio</th><th className="num">Unique Clicks</th><th>Click Ratio</th><th className="num">Not Open</th><th className="num">Not Open %</th></tr></thead>
               <tbody>{g.rows.map((r) => {
                 const read = r.sent ? r.opened / r.sent : 0, click = r.sent ? r.clicks / r.sent : 0, notOpen = Math.max(0, r.sent - r.opened);
                 return (

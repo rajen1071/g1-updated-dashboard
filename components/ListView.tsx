@@ -15,18 +15,18 @@ const name = (sub?: string): Col => ({ k: "name", label: "Name", show: (r) => <d
 
 export const LISTS: Record<string, { label: string; note: string; cols: Col[]; sort: string; stats: (r: any[]) => [string, string][] }> = {
   emails: {
-    label: "emails", sort: "sent", note: "Sends in the selected dates, with the opens and email clicks of those sends. All Time Sent is the total stored by Mautic.",
+    label: "emails", sort: "sent", note: "Sends in the selected dates, with the opens and unique email clicks of those sends. All Time Sent is the total stored by Mautic.",
     cols: [name("subject"), product, { k: "category", label: "Category", show: (r) => r.category || "-" },
-      { k: "sent", label: "Sent", num: true, show: (r) => n(r.sent) }, { k: "opened", label: "Opens", num: true, show: (r) => n(r.opened) }, { k: "clicks", label: "Email Clicks", num: true, show: (r) => n(r.clicks) },
+      { k: "sent", label: "Sent", num: true, show: (r) => n(r.sent) }, { k: "opened", label: "Opens", num: true, show: (r) => n(r.opened) }, { k: "clicks", label: "Unique Clicks", num: true, show: (r) => n(r.clicks) },
       { k: "rate", label: "Open Rate", num: true, get: (r) => (r.sent ? r.opened / r.sent : -1), show: (r) => pct(r.opened, r.sent) },
       { k: "allSent", label: "All Time Sent", num: true, show: (r) => n(r.allSent) }, modified],
     stats: (r) => { const s = r.reduce((a, x) => a + x.sent, 0), o = r.reduce((a, x) => a + x.opened, 0); return [["Emails sent in these dates", `${n(r.filter((x) => x.sent > 0).length)} of ${n(r.length)}`], ["Total sent", n(s)], ["Total opens", n(o)], ["Average open rate", pct(o, s)]]; },
   },
   campaigns: {
-    label: "campaigns", sort: "sent", note: "Sent, open rate and email clicks add up the emails each campaign sends, for the selected dates. Steps, segments and forms are the campaign setup.",
+    label: "campaigns", sort: "sent", note: "Sent, open rate and unique email clicks add up the emails each campaign sends, for the selected dates. Steps, segments and forms are the campaign setup.",
     cols: [name(), { k: "category", label: "Category", show: (r) => r.category || "-" },
       { k: "sent", label: "Sent", num: true, show: (r) => n(r.sent) }, { k: "rate", label: "Open Rate", num: true, get: (r) => (r.sent ? r.opened / r.sent : -1), show: (r) => pct(r.opened, r.sent) },
-      { k: "clicks", label: "Email Clicks", num: true, show: (r) => n(r.clicks) },
+      { k: "clicks", label: "Unique Clicks", num: true, show: (r) => n(r.clicks) },
       { k: "events", label: "Steps", num: true, show: (r) => n(r.events) }, { k: "segments", label: "Segments", num: true, show: (r) => n(r.segments) }, { k: "forms", label: "Forms", num: true, show: (r) => n(r.forms) }, modified],
     stats: (r) => { const s = r.reduce((a, x) => a + x.sent, 0), o = r.reduce((a, x) => a + x.opened, 0); return [["Campaigns sending in these dates", `${n(r.filter((x) => x.sent > 0).length)} of ${n(r.length)}`], ["Emails sent", n(s)], ["Average open rate", pct(o, s)], ["Email clicks", n(r.reduce((a, x) => a + x.clicks, 0))]]; },
   },

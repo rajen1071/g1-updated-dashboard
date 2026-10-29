@@ -1,6 +1,6 @@
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { INSTANCES } from "@/lib/instances";
-import { count, hidden, productOf, runPool, W } from "@/lib/mautic";
+import { clicksBetween, count, hidden, productOf, runPool, uniqueClickCount, W } from "@/lib/mautic";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams;
   const key = q.get("instance") || "", product = q.get("product") || "", from = q.get("from") || "", to = q.get("to") || "";
   if (!INSTANCES[key] || !from || !to) return Response.json({ error: "bad params" }, { status: 400 });
-  const ck = ["overview3", key, product, from, to].join("|");
+  const ck = ["overview4", key, product, from, to].join("|");
   const hit = await cacheGet(ck, !!q.get("refresh"));
   if (hit) return Response.json({ ...hit, cached: true });
   try {
@@ -48,7 +48,6 @@ export async function GET(req: Request) {
     buckets.forEach((b) => {
       tasks.push(() => count(key, "email_stats", [...rng("date_sent", b), ...inP("email_id")]));
       tasks.push(() => count(key, "email_stats", [...rng("date_sent", b), { col: "is_read", expr: "eq", val: 1 }, ...inP("email_id")]));
-      tasks.push(() => count(key, "page_hits", [...rng("date_hit", b), { col: "source", expr: "eq", val: "email" }, ...inP("source_id")]));
       tasks.push(lp(b));
       tasks.push(forms(b));
       tasks.push(() => count(key, "lead_donotcontact", [...rng("date_added", b), { col: "channel", expr: "eq", val: "email" }, { col: "reason", expr: "eq", val: 2 }, ...inP("channel_id")]));
@@ -60,24 +59,27 @@ export async function GET(req: Request) {
     const prevTasks: (() => Promise<number | null>)[] = [
       () => count(key, "email_stats", [...rng("date_sent", before), ...inP("email_id")]),
       () => count(key, "email_stats", [...rng("date_sent", before), { col: "is_read", expr: "eq", val: 1 }, ...inP("email_id")]),
-      () => count(key, "page_hits", [...rng("date_hit", before), { col: "source", expr: "eq", val: "email" }, ...inP("source_id")]),
       lp(before),
       forms(before),
       () => count(key, "lead_donotcontact", [...rng("date_added", before), { col: "channel", expr: "eq", val: "email" }, { col: "reason", expr: "eq", val: 2 }, ...inP("channel_id")]),
       () => count(key, "lead_donotcontact", [...rng("date_added", before), { col: "channel", expr: "eq", val: "email" }, { col: "reason", expr: "eq", val: 1 }, ...inP("channel_id")]),
     ];
-    const [r, pv, pr] = await Promise.all([runPool(tasks, 12), runPool(prevTasks, 4), byPromise.then((byP) => {
+    // Unique email clicks (each contact once per email), from the click rows of the selected and previous dates.
+    const shown = P ? new Set(P.split(",").map(Number)) : null, hide = new Set(H.emails.split(",").filter(Boolean).map(Number));
+    const clicksPromise = clicksBetween(key, before.s, whole.e).then((l) => l.filter((c) => (shown ? shown.has(c[0]) : !hide.has(c[0]))));
+    const uc = (l: Awaited<typeof clicksPromise>, b: { s: string; e: string }) => uniqueClickCount(l.filter((c) => c[2] >= b.s && c[2] < b.e));
+    const [r, pv, pr, cl] = await Promise.all([runPool(tasks, 12), runPool(prevTasks, 4), byPromise.then((byP) => {
       const prods = !product && multi ? Object.entries(byP) : [];
       return runPool(prods.flatMap(([name, ids]) => [
         () => count(key, "email_stats", [...rng("date_sent", whole), { col: "email_id", expr: "in", val: ids.join(",") }]),
         () => count(key, "email_stats", [...rng("date_sent", whole), { col: "is_read", expr: "eq", val: 1 }, { col: "email_id", expr: "in", val: ids.join(",") }]),
       ]), 8).then((c) => prods.map(([name], i) => ({ name, sent: c[i * 2], opened: c[i * 2 + 1] })));
-    })]);
-    const series = buckets.map((b, i) => { const o = r.slice(i * 7, i * 7 + 7); return { label: b.label, sent: o[0], opened: o[1], clicks: o[2], lp: o[3], forms: o[4], bounced: o[5], unsub: o[6] }; });
+    }), clicksPromise]);
+    const series = buckets.map((b, i) => { const o = r.slice(i * 6, i * 6 + 6); return { label: b.label, sent: o[0], opened: o[1], clicks: uc(cl, b), lp: o[2], forms: o[3], bounced: o[4], unsub: o[5] }; });
     const sum = (f: string) => series.some((s: any) => s[f] < 0) ? null : series.reduce((a: number, s: any) => a + s[f], 0);
-    const kpi = { sent: sum("sent"), opened: sum("opened"), clicks: sum("clicks"), lp: sum("lp"), forms: sum("forms"), bounced: sum("bounced"), unsub: sum("unsub") };
+    const kpi = { sent: sum("sent"), opened: sum("opened"), clicks: uc(cl, whole), lp: sum("lp"), forms: sum("forms"), bounced: sum("bounced"), unsub: sum("unsub") };
     const products = pr;
-    const prev = { sent: pv[0], opened: pv[1], clicks: pv[2], lp: pv[3], forms: pv[4], bounced: pv[5], unsub: pv[6] };
+    const prev = { sent: pv[0], opened: pv[1], clicks: uc(cl, before), lp: pv[2], forms: pv[3], bounced: pv[4], unsub: pv[5] };
     const data = { series: series.map((s) => ({ ...s, lp: Math.max(0, s.lp), forms: Math.max(0, s.forms) })), kpi, prev, products };
     await cacheSet(ck, data);
     return Response.json(data);

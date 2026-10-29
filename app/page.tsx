@@ -130,7 +130,7 @@ export default function Page() {
       <main className="main">
         <header className="top">
           <button className="ib" onClick={toggleSide} aria-label="Show or hide the menu" title="Show or hide the menu"><Icon name="menu" /></button>
-          <div className="ttl"><h1>{title}</h1><p>{view === "sendmonitor" ? hint : <>{scope}{validRange && <> · {day(range.from, true)} – {day(range.to, true)}</>}</>}</p></div>
+          <div className="ttl"><h1>{title}</h1><p>{view === "sendmonitor" ? hint : <>{scope}{validRange && <> · {day(range.from, true)} - {day(range.to, true)}</>}</>}</p></div>
           <div className="tools">
             {view === "sendmonitor" && <span className="checked">{checkedText(sm.checked)}</span>}
             {/* Custom dates open in a small menu, so the header keeps the same width. */}
@@ -138,7 +138,7 @@ export default function Page() {
               <div className="seg">
                 {RANGES.map(([w, l]) => <button key={w} className={weeks === w ? "on" : ""} onClick={() => { setWeeks(w); setDateMenu(false); }}>{l}</button>)}
                 <button className={weeks === "custom" ? "on" : ""} aria-expanded={dateMenu} onClick={() => { if (weeks !== "custom") { setCustom(range); setWeeks("custom"); } setDateMenu(!dateMenu); }}>
-                  <Icon name="calendar" size={14} /> {weeks === "custom" && validRange ? `${day(range.from)} – ${day(range.to)}` : "Custom"}
+                  <Icon name="calendar" size={14} /> {weeks === "custom" && validRange ? `${day(range.from)} - ${day(range.to)}` : "Custom"}
                 </button>
               </div>
               {dateMenu && <div className="menu date-menu">

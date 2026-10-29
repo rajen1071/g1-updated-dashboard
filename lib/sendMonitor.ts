@@ -106,15 +106,15 @@ export function statusFor(sends: Sends, p: Scheduled, date: string, now = Date.n
   let lateLabel = "Sent Late";
   if (c.late > 0 && c.lateFirst) {
     const d1 = pacificDay(c.lateFirst), delay = daysBetween(date, d1);
-    parts.push(`${num(c.late)} due ${day}, sent ${DAYNAMES[weekday(d1)]} ${nice(d1, { month: "short", day: "numeric" })} (${plural(delay, "day")} late).`);
+    parts.push(`${num(c.late)} ${c.late === 1 ? "email was" : "emails were"} due ${day} but sent on ${DAYNAMES[weekday(d1)]} ${nice(d1, { month: "short", day: "numeric" })} (${plural(delay, "day")} late).`);
     // Rolling campaigns send each next email 7 days after the last one, so a late email moves the contact's later emails too.
-    if (p.rolling) { lateLabel = "Out of Sequence"; parts.push(`Next emails move to ${DAYNAMES[weekday(d1)]}.`); }
+    if (p.rolling) { lateLabel = "Out of Sequence"; parts.push(`Upcoming follow-up emails will now go out on ${DAYNAMES[weekday(d1)]}.`); }
   }
   if (waiting) parts.push(`${num(c.pending)} still waiting.`);
   const lateShare = (c.late / sent) * 100;
   if (lateShare > SEND_MONITOR.latePercent) return { ...b, k: "late", label: lateLabel, why: parts.join(" ") };
   if (change !== null && change < -SEND_MONITOR.dropAlertPercent)
-    return { ...b, k: "low", label: "Sent", why: [`${Math.abs(change)}% fewer than last send (${num(prev!.count)}).`, ...parts].join(" ") };
+    return { ...b, k: "low", label: "Sent", why: [`${Math.abs(change)}% fewer emails than the last send (${num(prev!.count)}).`, ...parts].join(" ") };
   return { ...b, k: "sent", label: "Sent", why: parts.length ? parts.join(" ") : undefined };
 }
 // This week's send day if it has passed or is today, else last week's.

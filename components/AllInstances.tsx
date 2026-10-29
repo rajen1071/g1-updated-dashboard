@@ -77,8 +77,8 @@ export default function AllInstances({ res, pending, theme, onOpen, onBack }: Pr
                     {isOpen && ps.map((p: any) => (
                       <tr className="row-sub" key={p.name}>
                         <td><span className="sub-name">{p.name}</span></td>
-                        <td className="num">{n(p.sent)}</td><td className="num">—</td><td className="num">{n(p.opened)}</td><td className="num">{pct(p.opened, p.sent)}</td>
-                        {HEAD.slice(4).map((h) => <td key={h} className="num">—</td>)}<td />
+                        <td className="num">{n(p.sent)}</td><td className="num">-</td><td className="num">{n(p.opened)}</td><td className="num">{pct(p.opened, p.sent)}</td>
+                        {HEAD.slice(4).map((h) => <td key={h} className="num">-</td>)}<td />
                       </tr>))}
                     {isOpen && ps.length === 0 && <tr className="row-sub"><td colSpan={HEAD.length + 2}><span className="sub-name">No product data for these dates.</span></td></tr>}
                   </Fragment>);

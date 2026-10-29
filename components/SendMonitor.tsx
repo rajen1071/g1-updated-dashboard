@@ -8,13 +8,15 @@ import { Loading } from "./ui";
 const n = (x: number) => (+x).toLocaleString("en-US");
 const ORDER: Record<Kind, number> = { missing: 0, pending: 1, late: 2, low: 3, unknown: 4, due: 5, sent: 6, upcoming: 7 };
 // Small icon per status: check = on time, clock = late or waiting, triangle = not sent, info = unknown.
-const ICON: Record<Kind, string> = { sent: "✓", late: "◷", pending: "◷", due: "●", missing: "!", low: "▼", unknown: "i", upcoming: "–" };
+const ICON: Record<Kind, string> = { sent: "✓", late: "◷", pending: "◷", due: "●", missing: "!", low: "▼", unknown: "i", upcoming: "-" };
 
 // Explanation shown on hover, keyboard focus or tap.
-function Tip({ text, children, className }: { text?: string; children: React.ReactNode; className?: string }) {
+function Tip({ head, text, children, className }: { head?: string; text?: string; children: React.ReactNode; className?: string }) {
   const id = useId();
-  if (!text) return <span className={className}>{children}</span>;
-  return <span className={`tip ${className || ""}`} tabIndex={0} aria-describedby={id}>{children}<span role="tooltip" id={id} className="tip-box">{text}</span></span>;
+  if (!text && !head) return <span className={className}>{children}</span>;
+  const points = text ? text.split(/(?<=\.)\s+(?=[A-Z0-9])/) : [];
+  const body = points.length > 1 ? <ul>{points.map((x, i) => <li key={i}>{x}</li>)}</ul> : points[0];
+  return <span className={`tip ${className || ""}`} tabIndex={0} aria-describedby={id}>{children}<span role="tooltip" id={id} className="tip-box">{head && <b className="tip-h">{head}</b>}{body}</span></span>;
 }
 
 // Sends of every instance, loaded for the sidebar badge too, so a missed send shows on every page.
@@ -82,7 +84,7 @@ export default function SendMonitor({ data }: { data: ReturnType<typeof useSends
       c.pending ? `${n(c.pending)} emails are still waiting to send.` : "Every email that was due went out; fewer contacts were due this week."];
   };
   const li = (x: (typeof iss)[number]) => { const [what, mean] = alertMsg(x); return (
-    <li key={x.p.id}><b>{x.p.name}</b> · {x.d === t ? "today" : nice(x.d)}: <b>{x.s.k === "low" ? "Lower volume" : x.s.label}</b> – {what}
+    <li key={x.p.id}><b>{x.p.name}</b> · {x.d === t ? "today" : nice(x.d)}: <b>{x.s.k === "low" ? "Lower volume" : x.s.label}</b> - {what}
       <div className="why" style={{ maxWidth: "none", marginTop: 1 }}>{mean}</div></li>); };
   const due = dueToday.filter((p) => statusFor(sends, p, t).k === "due");
 
@@ -122,9 +124,9 @@ export default function SendMonitor({ data }: { data: ReturnType<typeof useSends
             <div className="st">Sent today: <b>{n(sentToday)}</b></div>
             <div className="st">Not sent: <b className={miss.length ? "red" : ""}>{miss.length}</b></div>
             <div className="st">Sent late: <b>{late.length}</b></div>
-            <div className="st">Next send: <b>{nextD ? nice(nextD, { weekday: "long" }) : "–"}</b>{nextD && <span> ({next.filter((x) => x.d === nextD).map((x) => x.p.name).join(", ")})</span>}</div>
+            <div className="st">Next send: <b>{nextD ? nice(nextD, { weekday: "long" }) : "-"}</b>{nextD && <span> ({next.filter((x) => x.d === nextD).map((x) => x.p.name).join(", ")})</span>}</div>
           </div>
-          <div className="wk-h">This week <span>Mon–Sun</span></div>
+          <div className="wk-h">This week <span>Mon-Sun</span></div>
           {wdays.filter((d) => prods.some((p) => p.weekday === weekday(d))).map((d) => (
             <div className="wrow" key={d}>
               <div className={`wlab ${d === t ? "today" : ""}`}>{d === t ? "● Today" : nice(d, { weekday: "short" })} {nice(d, { month: "short", day: "numeric" })}</div>
@@ -150,8 +152,8 @@ export default function SendMonitor({ data }: { data: ReturnType<typeof useSends
                   <td><b style={{ fontWeight: 500 }}>{p.name}</b>{p.note && <div className="why">{p.note}</div>}</td><td>{instName(p.instance)}</td>
                   <td><Tip text={rule(p)}><span className="daytag">{DAYNAMES[p.weekday]}</span>{p.rolling && <div className="why">+ 7-day follow-ups</div>}</Tip></td><td>{d === t ? "Today" : nice(d)}</td>
                   <td className="num">{n(s.sent)}</td>
-                  <td className="num">{s.prev ? <>{n(s.prev.count)}<div className="why">{nice(s.prev.date)}</div></> : "–"}</td>
-                  <td className="num">{s.change === null ? "–" : <span className={`sm-chg ${s.k === "low" ? "down" : ""}`}>{s.change > 0 ? "▲ +" : s.change < 0 ? "▼ " : ""}{s.change}%</span>}</td>
+                  <td className="num">{s.prev ? <>{n(s.prev.count)}<div className="why">{nice(s.prev.date)}</div></> : "-"}</td>
+                  <td className="num">{s.change === null ? "-" : <span className={`sm-chg ${s.k === "low" ? "down" : ""}`}>{s.change > 0 ? "▲ +" : s.change < 0 ? "▼ " : ""}{s.change}%</span>}</td>
                   <td><Tip text={s.why}><span className={`pill p-${s.k}`}>{ICON[s.k]} {s.label}{s.why && <span className="info" aria-hidden>ⓘ</span>}</span></Tip></td>
                   <td>{nx === t ? "Today" : nice(nx)}</td>
                 </tr>);
@@ -167,9 +169,9 @@ export default function SendMonitor({ data }: { data: ReturnType<typeof useSends
             <tbody>{prods.map((p) => (
               <tr key={p.id}><td><b>{p.name}</b><span>{instName(p.instance)} · {DAYNAMES[p.weekday]}</span></td>{weeks.map((w) => {
                 const d = addDays(w, (p.weekday + 6) % 7), s = statusFor(sends, p, d);
-                const txt = s.k === "upcoming" ? "–" : s.k === "due" ? "Due" : s.k === "missing" ? "Not Sent" : s.k === "pending" ? "Waiting" : s.k === "unknown" ? "?" : short(s.sent);
+                const txt = s.k === "upcoming" ? "-" : s.k === "due" ? "Due" : s.k === "missing" ? "Not Sent" : s.k === "pending" ? "Waiting" : s.k === "unknown" ? "?" : short(s.sent);
                 const head = `${nice(d)}: ${s.label}${s.sent ? ` · ${n(s.sent)}` : ""}`;
-                return <td key={w}><Tip className={`cell c-${s.k}`} text={s.why ? `${head}. ${s.why}` : head}>{s.k !== "upcoming" && <span className="ico" aria-hidden>{ICON[s.k]}</span>}{txt}</Tip></td>;
+                return <td key={w}><Tip className={`cell c-${s.k}`} head={head} text={s.why}>{s.k !== "upcoming" && <span className="ico" aria-hidden>{ICON[s.k]}</span>}{txt}</Tip></td>;
               })}</tr>))}</tbody>
           </table></div>
           <div className="sm-legend">

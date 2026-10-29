@@ -19,12 +19,12 @@ test("2. one day late: amber, with the actual date in plain English, counted onc
   const s = statusFor(S(tue.id, { "2026-11-03": c(900), "2026-11-10": c(0, 900, 0, "2026-11-11 18:02:00") }), tue, "2026-11-10", NOW);
   assert.equal(s.k, "late"); assert.equal(s.sent, 900); assert.equal(s.change, 0);
   assert.equal(s.label, "Out of Sequence"); // rolling campaign
-  assert.equal(s.why, "900 due Tuesday, sent Wednesday Nov 11 (1 day late). Next emails move to Wednesday.");
+  assert.equal(s.why, "900 emails were due Tuesday but sent on Wednesday Nov 11 (1 day late). Upcoming follow-up emails will now go out on Wednesday.");
 });
 
 test("3. several days late", () => {
   const s = statusFor(S(tue.id, { "2026-11-03": c(0, 3902, 0, "2026-11-05 17:02:00", "2026-11-05 17:13:00") }), tue, "2026-11-03", NOW);
-  assert.equal(s.k, "late"); assert.match(s.why!, /sent Thursday Nov 5 \(2 days late\)/);
+  assert.equal(s.k, "late"); assert.match(s.why!, /sent on Thursday Nov 5 \(2 days late\)/);
 });
 
 test("4. genuinely not sent", () => {
@@ -51,7 +51,7 @@ test("6. late send in the following week stays under the week it was scheduled f
 
 test("7. fixed-weekday campaign: late note does not claim the next emails move", () => {
   const s = statusFor(S(fixed.id, { "2026-11-10": c(100, 900, 0, "2026-11-11 16:00:00") }), fixed, "2026-11-10", NOW);
-  assert.equal(s.k, "late"); assert.equal(s.label, "Sent Late"); assert.doesNotMatch(s.why!, /Next emails move/);
+  assert.equal(s.k, "late"); assert.equal(s.label, "Sent Late"); assert.doesNotMatch(s.why!, /Upcoming follow-up/);
   // next send for a fixed campaign is still the weekday
   assert.equal(nextSend(S(fixed.id, {}), fixed, null, NOW), "2026-11-17");
 });
@@ -63,7 +63,7 @@ test("8. rolling campaign: next send follows Mautic's queue when it is sooner", 
 
 test("9. a few late emails on a mostly on-time day stay 'Sent on time' but are explained", () => {
   const s = statusFor(S(tue.id, { "2026-11-10": c(950, 30, 0, "2026-11-11 08:00:00") }), tue, "2026-11-10", NOW);
-  assert.equal(s.k, "sent"); assert.match(s.why!, /30 due Tuesday/);
+  assert.equal(s.k, "sent"); assert.match(s.why!, /30 emails were due Tuesday/);
 });
 
 test("10. no double counting: total = on time + late, pending excluded", () => {

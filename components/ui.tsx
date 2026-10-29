@@ -6,7 +6,7 @@ export function Loading({ keys }: { keys: string[] }) {
     <div className="note-bar" role="status">
       <span className="spin" />
       <div><b>Loading data from Mautic: {keys.map((k) => INSTANCES[k].short).join(", ")}</b>
-        <small>The first load may take 10–30 seconds. After that, results are saved and load quickly until someone clicks Refresh.</small></div>
+        <small>The first load may take 10-30 seconds. After that, results are saved and load quickly until someone clicks Refresh.</small></div>
     </div>
   );
 }

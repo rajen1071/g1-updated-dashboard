@@ -10,13 +10,13 @@ import { Card, Errors, Loading, Sk } from "./ui";
 
 type Col = { k: string; label: string; num?: boolean; get?: (r: any) => any; show?: (r: any) => React.ReactNode };
 const modified: Col = { k: "modified", label: "Last Updated", show: (r) => day(r.modified, true) };
-const product: Col = { k: "product", label: "Product", show: (r) => r.product || "—" };
+const product: Col = { k: "product", label: "Product", show: (r) => r.product || "-" };
 const name = (sub?: string): Col => ({ k: "name", label: "Name", show: (r) => <div className="cell-name"><div><b>{r.name}</b>{sub && r[sub] && <small>{r[sub]}</small>}</div></div> });
 
 export const LISTS: Record<string, { label: string; note: string; cols: Col[]; sort: string; stats: (r: any[]) => [string, string][] }> = {
   emails: {
     label: "emails", sort: "sent", note: "Sends in the selected dates, with the opens and email clicks of those sends. All Time Sent is the total stored by Mautic.",
-    cols: [name("subject"), product, { k: "category", label: "Category", show: (r) => r.category || "—" },
+    cols: [name("subject"), product, { k: "category", label: "Category", show: (r) => r.category || "-" },
       { k: "sent", label: "Sent", num: true, show: (r) => n(r.sent) }, { k: "opened", label: "Opens", num: true, show: (r) => n(r.opened) }, { k: "clicks", label: "Email Clicks", num: true, show: (r) => n(r.clicks) },
       { k: "rate", label: "Open Rate", num: true, get: (r) => (r.sent ? r.opened / r.sent : -1), show: (r) => pct(r.opened, r.sent) },
       { k: "allSent", label: "All Time Sent", num: true, show: (r) => n(r.allSent) }, modified],
@@ -24,7 +24,7 @@ export const LISTS: Record<string, { label: string; note: string; cols: Col[]; s
   },
   campaigns: {
     label: "campaigns", sort: "sent", note: "Sent, open rate and email clicks add up the emails each campaign sends, for the selected dates. Steps, segments and forms are the campaign setup.",
-    cols: [name(), { k: "category", label: "Category", show: (r) => r.category || "—" },
+    cols: [name(), { k: "category", label: "Category", show: (r) => r.category || "-" },
       { k: "sent", label: "Sent", num: true, show: (r) => n(r.sent) }, { k: "rate", label: "Open Rate", num: true, get: (r) => (r.sent ? r.opened / r.sent : -1), show: (r) => pct(r.opened, r.sent) },
       { k: "clicks", label: "Email Clicks", num: true, show: (r) => n(r.clicks) },
       { k: "events", label: "Steps", num: true, show: (r) => n(r.events) }, { k: "segments", label: "Segments", num: true, show: (r) => n(r.segments) }, { k: "forms", label: "Forms", num: true, show: (r) => n(r.forms) }, modified],
@@ -32,13 +32,13 @@ export const LISTS: Record<string, { label: string; note: string; cols: Col[]; s
   },
   pages: {
     label: "landing pages", sort: "visits", note: "Visits are counted for the selected dates. Mautic only keeps unique visitors as an all-time total, so those columns do not change with the dates.",
-    cols: [name(), product, { k: "category", label: "Category", show: (r) => r.category || "—" }, { k: "visits", label: "Visits", num: true, show: (r) => n(r.visits) },
+    cols: [name(), product, { k: "category", label: "Category", show: (r) => r.category || "-" }, { k: "visits", label: "Visits", num: true, show: (r) => n(r.visits) },
       { k: "hits", label: "All Time Visits", num: true, show: (r) => n(r.hits) }, { k: "unique", label: "All Time Unique", num: true, show: (r) => n(r.unique) }, modified],
     stats: (r) => [["Landing pages visited", `${n(r.filter((x) => x.visits > 0).length)} of ${n(r.length)}`], ["Visits (selected dates)", n(r.reduce((a, x) => a + x.visits, 0))], ["Visits (all time)", n(r.reduce((a, x) => a + x.hits, 0))], ["Unique visits (all time)", n(r.reduce((a, x) => a + x.unique, 0))]],
   },
   forms: {
     label: "forms", sort: "submissions", note: "Submissions are counted for the selected dates, for the same number of days just before them, and for all time.",
-    cols: [name(), product, { k: "category", label: "Category", show: (r) => r.category || "—" }, { k: "submissions", label: "Submissions", num: true, show: (r) => n(r.submissions) },
+    cols: [name(), product, { k: "category", label: "Category", show: (r) => r.category || "-" }, { k: "submissions", label: "Submissions", num: true, show: (r) => n(r.submissions) },
       { k: "prev", label: "Previous Period", num: true, show: (r) => n(r.prev) },
       { k: "change", label: "Change", num: true, get: (r) => (r.prev ? (r.submissions - r.prev) / r.prev : r.submissions ? 1e9 : -1e9), show: (r) => <Change cur={r.submissions} prev={r.prev} /> },
       { k: "total", label: "All Time", num: true, show: (r) => n(r.total) }, modified],
@@ -92,7 +92,7 @@ export default function ListView({ type, ks, range, product, nonce }: { type: st
           </table>
         </div>
         {pages > 1 && <div className="pager">
-          <span>Showing {page * PAGE + 1}–{Math.min(rows.length, (page + 1) * PAGE)} of {n(rows.length)}</span>
+          <span>Showing {page * PAGE + 1}-{Math.min(rows.length, (page + 1) * PAGE)} of {n(rows.length)}</span>
           <button className="btn" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button>
           <span>Page {page + 1} of {pages}</span>
           <button className="btn" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>Next</button>

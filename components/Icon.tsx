@@ -5,6 +5,7 @@ const P: Record<string, string> = {
   instances: "M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01",
   emails: "M3 5h18v14H3zM3 6l9 7 9-7",
   nurture: "M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5",
+  nurture2: "M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M17 17h4M19 15v4",
   campaigns: "M4 21V4M4 4h12l-2 4 2 4H4",
   pages: "M4 3h16v18H4zM4 8h16M9 8v13",
   forms: "M8 3h8v3H8zM6 5H5v16h14V5h-1M9 11h6M9 15h6",

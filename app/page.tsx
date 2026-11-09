@@ -12,6 +12,7 @@ import ListView from "@/components/ListView";
 import ExportView from "@/components/ExportView";
 import NurtureView from "@/components/NurtureView";
 import NewsletterView from "@/components/NewsletterView";
+import Nurture2View from "@/components/Nurture2View";
 import SendMonitor, { checkedText, useSends } from "@/components/SendMonitor";
 import { FormsTrend } from "@/components/OverviewSections";
 
@@ -21,6 +22,7 @@ const NAV: [string, string, string][] = [
   ["instances", "All Instances", "Compare every Mautic instance side by side"],
   ["newsletter", "Newsletter", "Every newsletter sent in the selected dates, with its sends, opens, clicks, bounces and unsubscribes"],
   ["nurture", "Nurture Emails", "Each nurture email with its A/B/C/D variants side by side, for the selected dates"],
+  ["nurture2", "Nurture 2.0", "Nurture 2.0 emails, landing pages and forms (items with \"2.0\" in their name), for the selected dates"],
   ["emails", "Email Reports", "Every email with sends, opens and clicks in the selected dates"],
   ["campaigns", "Campaigns", "Every campaign with its sends in the selected dates and its setup"],
   ["pages", "Landing Pages", "Every landing page with visits in the selected dates"],
@@ -176,7 +178,7 @@ export default function Page() {
               </div>
             </div>))}
         </div>}
-        {products.length > 1 && ["overview", "emails", "nurture", "pages", "forms", "export"].includes(view) && <div className="chips">
+        {products.length > 1 && ["overview", "emails", "nurture", "nurture2", "pages", "forms", "export"].includes(view) && <div className="chips">
           <span>Product:</span>
           <button className={!product ? "on" : ""} onClick={() => setProduct("")}>All products</button>
           {products.map((p) => <button key={p} className={product === p ? "on" : ""} onClick={() => setProduct(p)}>{p}</button>)}
@@ -190,6 +192,7 @@ export default function Page() {
         {["emails", "campaigns", "pages", "forms"].includes(view) && validRange && <ListView key={view} type={view} ks={ks} range={range} product={prod} nonce={nonce} />}
         {view === "newsletter" && validRange && <NewsletterView ks={ks} range={range} theme={theme} nonce={nonce} onBack={() => go("overview")} />}
         {view === "nurture" && validRange && <NurtureView ks={ks} range={range} product={prod} nonce={nonce} onBack={() => go("overview")} />}
+        {view === "nurture2" && validRange && <Nurture2View ks={ks} range={range} product={prod} nonce={nonce} />}
         {view === "export" && <ExportView ks={ks} res={res} pending={pending} range={range} product={prod} scope={scope} onPrint={() => { go("overview"); setTimeout(() => window.print(), 800); }} />}
       </main>
     </div>

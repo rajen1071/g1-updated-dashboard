@@ -23,8 +23,8 @@ export const SCHEDULE: Scheduled[] = [
   { id: "accounting", name: "Accounting", instance: "accounting", weekday: 2, campaigns: [4], rolling: false },
   { id: "scheduling", name: "Scheduling", instance: "altametrics", weekday: 2, campaigns: [332], rolling: true },
   { id: "timeclock", name: "Timeclock", instance: "altametrics", weekday: 2, campaigns: [337], rolling: true },
-  // Operations (formerly Inventory): the eBooks are filed under 25206 | Operations; the 25206 nurture campaign is named "Operations".
-  { id: "inventory", name: "Operations", instance: "altametrics", weekday: 2, campaigns: [335], rolling: true, note: "Campaign 22106 Operations" },
+  // Operations (formerly Inventory): the eBooks are filed under 25206 | Operations; the nurture campaign is 529 "22106-001 Operations" (replaced 335).
+  { id: "inventory", name: "Operations", instance: "altametrics", weekday: 2, campaigns: [529], rolling: true },
   { id: "pos", name: "POS", instance: "plumpos", weekday: 3, campaigns: [9, 10], rolling: false },
   { id: "music", name: "Music", instance: "plumpos", weekday: 3, campaigns: [8], rolling: false },
 ];

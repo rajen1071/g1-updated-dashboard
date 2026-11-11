@@ -498,3 +498,7 @@ input[type=date]{height:38px;padding:0 10px;border:1px solid var(--border);borde
 .sm .tbl-wrap{overflow-x:auto}
 @media(min-width:1100px){.sm .tbl-wrap{overflow:visible}}
 @media(max-width:600px){.sm-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.sm-tab{flex:0 0 auto}.sm-card{padding:14px}}
+/* Section heading between groups of cards (Nurture 2.0 emails: form submission vs nurture sequence) */
+.sec-h { margin: 28px 0 12px; }
+.sec-h h2 { margin: 0; font-size: 17px; font-weight: 700; }
+.sec-h p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }

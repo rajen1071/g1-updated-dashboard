@@ -8,7 +8,7 @@ import Icon from "./Icon";
 import { Errors, Loading, Sk } from "./ui";
 
 type Props = { ks: string[]; range: Range; product: string; nonce: number; onBack: () => void };
-type Group = { key: string; inst: string; title: string; sub: string; product: string; rows: any[]; sent: number; opened: number; clicks: number };
+export type Group = { key: string; inst: string; title: string; sub: string; product: string; rows: any[]; sent: number; opened: number; clicks: number };
 const MODES: [string, string][] = [["nurture", "Nurture emails"], ["ab", "All A/B tests"], ["all", "All emails"]];
 const STEP = 10;
 
@@ -65,10 +65,18 @@ export default function NurtureView({ ks, range, product, nonce, onBack }: Props
 
       {first && Array.from({ length: 3 }, (_, i) => <div className="card" key={i}><Sk w="30%" h={18} /><Sk w="100%" h={120} /></div>)}
       {!first && all.length === 0 && <div className="card empty">No {label} were sent in these dates{product ? ` for ${product}` : ""}.</div>}
-      {all.slice(0, shown).map((g) => (
-        <section className="card flush vgroup" key={g.key}>
+      {all.slice(0, shown).map((g) => <VariantCard key={g.key} g={g} showInst={ks.length > 1} />)}
+      {all.length > shown && <div className="more"><button className="btn" onClick={() => setShown(shown + STEP)}>Show more ({n(all.length - shown)} left)</button></div>}
+    </>
+  );
+}
+
+// One email with its A/B variants: totals on top, one row per variant.
+export function VariantCard({ g, showInst }: { g: Group; showInst: boolean }) {
+  return (
+        <section className="card flush vgroup">
           <div className="vg-h">
-            <div><b>{g.title}</b><small>{ks.length > 1 ? `${INSTANCES[g.inst].short} · ` : ""}{g.sub || g.product}</small></div>
+            <div><b>{g.title}</b><small>{showInst ? `${INSTANCES[g.inst].short} · ` : ""}{g.sub || g.product}</small></div>
             <div className="vg-stats">
               <span>Sent <b>{n(g.sent)}</b></span><span>Opens <b>{n(g.opened)}</b></span><span>Unique Clicks <b>{n(g.clicks)}</b></span>
               <span>Open Rate <b>{pct(g.opened, g.sent)}</b></span><span>Click Rate <b>{pct(g.clicks, g.sent)}</b></span>
@@ -94,8 +102,6 @@ export default function NurtureView({ ks, range, product, nonce, onBack }: Props
               })}</tbody>
             </table>
           </div>
-        </section>))}
-      {all.length > shown && <div className="more"><button className="btn" onClick={() => setShown(shown + STEP)}>Show more ({n(all.length - shown)} left)</button></div>}
-    </>
+        </section>
   );
 }

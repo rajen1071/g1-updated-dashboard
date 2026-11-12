@@ -11,6 +11,7 @@ const P: Record<string, string> = {
   forms: "M8 3h8v3H8zM6 5H5v16h14V5h-1M9 11h6M9 15h6",
   newsletter: "M4 4h13v16H6a2 2 0 0 1-2-2zM17 8h3v10a2 2 0 0 1-2 2M8 8h5M8 12h5M8 16h5",
   export: "M12 3v12M7 10l5 5 5-5M4 19h16",
+  query: "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6",
   menu: "M4 6h16M4 12h16M4 18h16",
   close: "M6 6l12 12M18 6L6 18",
   refresh: "M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7",

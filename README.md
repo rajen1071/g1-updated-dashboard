@@ -19,6 +19,11 @@ Push to GitHub, import the repo in Vercel, add the same environment variables, a
 - Newsletter shows emails with "Newsletter" in their name (only Altametrics sends them). Sent newsletters are shown even if they were unpublished afterwards. The Overview shows the latest one.
 - The Overview cards compare the selected dates with the same number of days just before them. The Top Emails, Campaign Performance and Landing Page Performance tables use all-time counters (campaign numbers add up the emails each campaign sends).
 
+## Query page (optional, password protected)
+The **Query** page runs one simple `SELECT` on the activity tables Mautic opens to its API (`email_stats`, `page_hits`, `form_submissions`, `campaign_lead_event_log`, `lead_donotcontact` and about 30 more), for one instance at a time. There is still no database connection: each query becomes one call to Mautic's stats API.
+- Supported: `SELECT *`, chosen columns or `COUNT(*)`, one table, `WHERE` with `AND` (`=`, `!=`, `>`, `>=`, `<`, `<=`, `LIKE`, `IN`, `IS NULL`, `BETWEEN`), `ORDER BY`, `LIMIT` (up to 1,000 rows, 100 by default) and `OFFSET`. Not supported: `JOIN`, `OR`, `GROUP BY`, `SUM` and other functions, and anything that is not a `SELECT`.
+- Results show contact details (email addresses, IP addresses), so the page needs a password. Set `QUERY_PASSWORD` in `.env.local` and on Vercel. Without it the page is switched off. Results are never saved in the cache.
+
 ## MongoDB cache (optional, recommended on Vercel)
 Vercel runs the API in many short-lived functions, and each one starts with an empty memory cache, so pages kept loading from Mautic again.
 With `MONGODB_URI` set, every API answer is also saved in MongoDB (database `MONGODB_DB`, default `atlas-g1-email-dashboard`, collection `api_cache`) and shared by all functions.

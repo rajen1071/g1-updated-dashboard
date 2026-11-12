@@ -13,6 +13,7 @@ import ExportView from "@/components/ExportView";
 import NurtureView from "@/components/NurtureView";
 import NewsletterView from "@/components/NewsletterView";
 import Nurture2View from "@/components/Nurture2View";
+import QueryView from "@/components/QueryView";
 import SendMonitor, { checkedText, useSends } from "@/components/SendMonitor";
 import { FormsTrend } from "@/components/OverviewSections";
 
@@ -28,8 +29,11 @@ const NAV: [string, string, string][] = [
   ["pages", "Landing Pages", "Every landing page with visits in the selected dates"],
   ["forms", "Forms", "Every form with submissions in the selected dates, the previous period and all time"],
   ["export", "Export Reports", "Download the data as CSV files"],
+  ["query", "Query", "Run a simple SELECT query on the activity tables of one Mautic instance (password protected)"],
 ];
 const RANGES: [number, string][] = [[1, "1 Week"], [2, "2 Weeks"], [4, "4 Weeks"], [8, "8 Weeks"]];
+// Pages with their own controls: no date buttons, instance tabs or hint line.
+const OWN = ["sendmonitor", "query"];
 const OVERVIEW_VIEWS = ["overview", "instances", "forms", "export"];
 
 function load(k: string, d: string) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }
@@ -132,11 +136,11 @@ export default function Page() {
       <main className="main">
         <header className="top">
           <button className="ib" onClick={toggleSide} aria-label="Show or hide the menu" title="Show or hide the menu"><Icon name="menu" /></button>
-          <div className="ttl"><h1>{title}</h1><p>{view === "sendmonitor" ? hint : <>{scope}{validRange && <> · {day(range.from, true)} - {day(range.to, true)}</>}</>}</p></div>
+          <div className="ttl"><h1>{title}</h1><p>{OWN.includes(view) ? hint : <>{scope}{validRange && <> · {day(range.from, true)} - {day(range.to, true)}</>}</>}</p></div>
           <div className="tools">
             {view === "sendmonitor" && <span className="checked">{checkedText(sm.checked)}</span>}
             {/* Custom dates open in a small menu, so the header keeps the same width. */}
-            {view !== "sendmonitor" && <div className="date-box" ref={dateBox}>
+            {!OWN.includes(view) && <div className="date-box" ref={dateBox}>
               <div className="seg">
                 {RANGES.map(([w, l]) => <button key={w} className={weeks === w ? "on" : ""} onClick={() => { setWeeks(w); setDateMenu(false); }}>{l}</button>)}
                 <button className={weeks === "custom" ? "on" : ""} aria-expanded={dateMenu} onClick={() => { if (weeks !== "custom") { setCustom(range); setWeeks("custom"); } setDateMenu(!dateMenu); }}>
@@ -165,9 +169,9 @@ export default function Page() {
           </div>
         </header>
 
-        {!validRange && view !== "sendmonitor" && <div className="err">Please choose a start date and an end date. The start date must be before the end date.</div>}
+        {!validRange && !OWN.includes(view) && <div className="err">Please choose a start date and an end date. The start date must be before the end date.</div>}
 
-        {!["instances", "sendmonitor"].includes(view) && <div className="tabs" role="tablist">
+        {!["instances", ...OWN].includes(view) && <div className="tabs" role="tablist">
           <div className="tg"><span className="tg-h">Combined</span>
             <button className={`tab ${inst === "all" ? "on" : ""}`} onClick={() => pick("all")}><b>All Instances ({KEYS.length})</b><small>Altametrics and Plum</small></button></div>
           {GROUP_NAMES.map((g) => (
@@ -184,7 +188,7 @@ export default function Page() {
           {products.map((p) => <button key={p} className={product === p ? "on" : ""} onClick={() => setProduct(p)}>{p}</button>)}
         </div>}
 
-        {view !== "sendmonitor" && <p className="hint">{hint}</p>}
+        {!OWN.includes(view) && <p className="hint">{hint}</p>}
         {view === "sendmonitor" && <SendMonitor data={sm} />}
         {view === "overview" && <Overview ks={ks} res={res} pending={pending} product={prod} range={range} theme={theme} nonce={nonce} onOpen={details} onGo={go} />}
         {view === "instances" && <AllInstances res={res} pending={pending} theme={theme} onOpen={(k) => { setInst(k); setProduct(""); go("overview"); }} onBack={() => go("overview")} />}
@@ -193,6 +197,7 @@ export default function Page() {
         {view === "newsletter" && validRange && <NewsletterView ks={ks} range={range} theme={theme} nonce={nonce} onBack={() => go("overview")} />}
         {view === "nurture" && validRange && <NurtureView ks={ks} range={range} product={prod} nonce={nonce} onBack={() => go("overview")} />}
         {view === "nurture2" && validRange && <Nurture2View ks={ks} range={range} product={prod} nonce={nonce} />}
+        {view === "query" && <QueryView />}
         {view === "export" && <ExportView ks={ks} res={res} pending={pending} range={range} product={prod} scope={scope} onPrint={() => { go("overview"); setTimeout(() => window.print(), 800); }} />}
       </main>
     </div>
